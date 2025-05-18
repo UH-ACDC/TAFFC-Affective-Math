@@ -83,15 +83,15 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** contains the following columns:
 
 -   **Column A: ParticipantID**: The anonymized participant IDs.
 -   **Column B: Question.Name**: Unique question ID.
--   **Column C: Question.Type**: Type of question with levels: [A ≡ Abstract, W ≡ Word, V ≡ Video, Example ≡ Initial practice problems].
+-   **Column C: Question.Type**: Type of question with levels: [A ≡ Abstract, W ≡ Word, V ≡ Video].
 -   **Column D: Gender**: The gender of participants with levels: [M ≡ Male, F ≡ Female].
 -   **Column E: Perspiration**: Mean perinasal perspiration signal (°C²) across exam trials.
--   **Column F: PPNorm** *(normalized signal)*: Mean normalized perinasal perspiration (corrected) across exam trials.
--   **Column G: HR.E4**: Mean heart rate (BPM) measured with the E4 on the participant's non-dominant hand.
+-   **Column F: PPNorm** : Mean calibrated/normalizated perinasal perspiration across exam trials.
 -   **Column H: HR.AW**: Mean heart rate (BPM) measured with the Apple Watch on the participant's dominant hand.
--   **Column I: HR.E4Norm** *(normalized signal)*: Mean normalized heart rate from E4 (corrected) across exam trials.
--   **Column J: HR.AWNorm** *(normalized signal)*: Mean normalized heart rate from Apple Watch across exam trials.
--   **Column K: HRVNorm** *(normalized signal)*: Mean corrected normalized HRV (NHRV.Corrected) across exam trials.
+-   **Column J: HR.AWNorm** : Mean calibrated/normalizated heart rate from Apple Watch across exam trials.
+-   **Column G: HR.E4**: Mean heart rate (BPM) measured with the E4 on the participant's non-dominant hand.
+-   **Column I: HR.E4Norm** : Mean calibrated/normalizated heart rate from E4  across exam trials.
+-   **Column K: HRVNorm** : Mean calibrated/normalizated HRV across exam trials.
 -   **Column L: SAI**: State Anxiety Inventory score (range 20–80).
 -   **Column M: q.solv.time**: Number of data samples (rows) in the exam subset per participant-question (used as a proxy for solving time).
 -   **Column N: Question.Order**: Problem order within each Question.Type category.

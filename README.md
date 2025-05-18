@@ -23,7 +23,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 
 ### Data description
 
-**`data/Affective_Math_Dataset_N50_BL.csv`** contains the following columns:
+**`data/processed/Affective_Math_Dataset_N50_BL.csv`** contains the following columns:
 
 -   **Column A: ParticipantID**: The anonymized participant IDs.
 -   **Column B: Time**: The time elapsed in seconds.
@@ -33,7 +33,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column F: HR.AW**: Values of the heart rate signal in BPM, measured with the Apple Watch on the participant's dominant hand.
 -   **Column G: HRV.IBI**: Values of the heart-rate variability, computed from inter-beat intervals (IBI, unit: ms), measured with E4 on the participant's non-dominant hand.
 
-**`data/Affective_Math_Dataset_N50_Exam.csv`** contains the following columns:
+**`data/processed/Affective_Math_Dataset_N50_Exam.csv`** contains the following columns:
 
 #### **Physiological and other data**
 
@@ -48,8 +48,8 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column I: Question.Type**: Type of question with levels: [A ≡ Abstract, W ≡ Word, V ≡ Video, Example ≡ Initial practice problems].
 -   **Column J: Attempt.Correctness**: Correctness of the current attempt (1 = correct, 0 = incorrect).
 -   **Column K: Attempt**: The number of the current attempt.
--   **Column L: Question.Order**: Problem order within each Question.Type (AWV 1–12).
--   **Column M: Question.Number**: Alphanumeric label representing question order as given to participant. Levels: [Ex1, Ex2, 1–36].
+-   **Column L: Question.Order**: Problem order within each Question.Type A, W, V [1–12].
+-   **Column M: Question.Number**: Alphanumeric label representing question order as given to participant. Levels: [1–36].
 -   **Column N: ExamVersion**: Indicates the counterbalancing order of the given exam.
 -   **Column O: Feedback**: Participants' feedback or comments (free-text).
 -   **Column P: course_cat**: The academic course category of the participant (e.g., subject area).
@@ -76,7 +76,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 
 ------------------------------------------------------------------------
 
-The **`data/TAFFC_ModelData_N50.csv`** contains the following columns:
+The **`data/processed/TAFFC_ModelData_N50.csv`** contains the following columns:
 
 -   **Column A: ParticipantID**: The anonymized participant IDs.
 -   **Column B: Question.Name**: Unique question ID.

@@ -23,7 +23,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 
 ### Data description
 
-**`data/TAFFC_BL_SignalLevel.csv`** contains the following columns:
+**`data/Affective_Math_Dataset_N50_BL.csv`** contains the following columns:
 
 -   **Column A: ParticipantID**: The anonymized participant IDs.
 -   **Column B: Time**: The time elapsed in seconds.
@@ -33,7 +33,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column F: HR.AW**: Values of the heart rate signal in BPM, measured with the Apple Watch on the participant's dominant hand.
 -   **Column G: HRV.IBI**: Values of the heart-rate variability, computed from inter-beat intervals (IBI, unit: ms), measured with E4 on the participant’s non-dominant hand.
 
-**`data/TAFFC_Exam_SignalLevel.csv`** contains the following columns:
+**`data/Affective_Math_Dataset_N50_Exam.csv`** contains the following columns:
 
 #### **Physiological and other data**
 
@@ -104,7 +104,6 @@ The **`data/TAFFC_ModelData_N50.csv`** contains the following columns:
 -   `data/` contains the data used in the paper.
 -   `figures/` contains the plots generated in the paper.
 -   `scripts/` contains the scripts used to generate the data and plots.
--   `requirements.txt` contains the dependencies of the code.
 -   `README.md` is this file.
 
 # Script Set

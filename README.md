@@ -53,7 +53,9 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column N: ExamVersion**: Indicates the counterbalancing order of the given exam.
 -   **Column O: Feedback**: Participants' feedback or comments (free-text).
 -   **Column P: course_cat**: The academic course category of the participant (e.g., subject area).
+#### **Psychometric Data** 
 -   **Column Q: SAI.Score**: Scores of the State & Trait Anxiety Inventory, range [20–80].
+####  **Valence Data**
 -   **Column R: Gender**: The gender of participants with levels: [M ≡ Male, F ≡ Female].
 -   **Column S: F_Angry**: Facial-expression intensity for "Angry."
 -   **Column T: F_Disgusted**: Facial-expression intensity for "Disgusted."
@@ -63,6 +65,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column X: F_Surprised**: Facial-expression intensity for "Surprised."
 -   **Column Y: F_Neutral**: Facial-expression intensity for "Neutral."
 -   **Column Z: G_Direction**: Gaze direction of the participant (e.g., angle in degrees).
+####  **SUS Data**
 -   **Column AA: SUS.Q1**: Response to System Usability Scale question 1.
 -   **Column AB: SUS.Q2**: Response to System Usability Scale question 2.
 -   **Column AC: SUS.Q3**: Response to System Usability Scale question 3.

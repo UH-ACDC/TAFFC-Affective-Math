@@ -98,7 +98,6 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** contains the following columns:
 -   **Column O: Question.Number**: Alphanumeric label representing question order as given to the participant (e.g., 1–36).
 -   **Column P: Grade**: Binary correctness indicator for this question (1 = correct, 0 = incorrect).
 -   **Column Q: course_cat**: Academic course category of the participant (e.g., subject area).
--   **Column R: Time_mean**: Mean elapsed time (seconds) since session start across exam trials.
 
 ------------------------------------------------------------------------
 

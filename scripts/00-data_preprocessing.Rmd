@@ -1,7 +1,7 @@
 ---
 title: "Data Preprocessing"
 author: "Fettah Kiran"
-subtitle: "Data Preprocessing and Feature Engineering - N = 50 "
+subtitle: "Data Preprocessing and Feature Engineering | N = 50 "
 date: "`r Sys.Date()`"
 output:
   html_document:

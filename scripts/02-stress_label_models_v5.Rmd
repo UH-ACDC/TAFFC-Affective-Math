@@ -1,0 +1,1159 @@
+---
+title: "Affective-Math Stress Models - N = 50"
+author: "Fettah Kiran"
+subtitle: "Stress.FP, Stress.HRE4, Stress.HRAW, Stress.HRV | N = 50"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    theme: united
+    number_sections: true 
+  #latex_engine: pdflatex
+  pdf_document: 
+    toc: true
+    number_sections: true 
+    keep_tex: true
+    extra_dependencies:
+      - float
+      - booktabs
+      - caption
+      - multirow
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+\newpage
+
+
+MODEL: \
+Model1: Stress FP \
+Model2: Stress HR.AW \
+Model3: Stress HR.E4 \
+Model4: Stress HRV \
+
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(readr)
+library(gridExtra)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library("car")
+library(lme4)
+library(lmerTest)
+library(lattice)
+library(sjPlot)
+library(Matrix)
+require(ggpmisc) # for stat_poly_eq
+library(reshape2)
+library(kableExtra)
+library(plotly)
+library(bestNormalize)
+library(jtools) # summ function
+library(latex2exp) # parses and converts LaTeX math formulas to R's plotmath expressions
+```
+
+
+
+```{r SpecialThemes, message=FALSE, warning=FALSE}
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+
+# Load custom functions
+#browseURL("fm_plot_func.R")
+source("fm_plot_func.R")
+
+data_dir = "../data/processed/" # data directory
+plot_dir = "../figures/" # plot directory
+
+is_save <- FALSE
+```
+
+\newpage
+
+
+# Read TAFFC_Qlevel_Data_N50.csv
+
+```{r readRawData, include=FALSE}
+N <- 50
+
+
+file = sprintf("%sTAFFC_Qlevel_Data_N%s.csv", data_dir, N)
+
+Qlevel = read.csv(file, header = TRUE, sep = ",", stringsAsFactors = T)
+
+
+names(Qlevel)
+
+Qlevel$Question.Type <- factor(Qlevel$Question.Type, levels = c("V", "A", "W"))
+Qlevel$Gender <- relevel(factor(Qlevel$Gender), ref = "M")
+Qlevel$Grade <- relevel(factor(Qlevel$Grade), ref = "0")
+
+```
+
+# QLevel Data 
+
+```{r Qlevel_Simple}
+
+
+Qlevel$Gender <- as.character(Qlevel$Gender)
+# Relevel the factors
+#Qlevel$Gender < factor(Qlevel$Gender, levels = c("F", "M"))
+Qlevel$Gender <- relevel(factor(Qlevel$Gender), ref = "M")
+Qlevel$Grade <- relevel(factor(Qlevel$Grade), ref = "0")
+levels(Qlevel$Gender)
+levels(Qlevel$Grade)
+# [1] "M" "F"
+
+Qlevel$Question.Type <- factor(Qlevel$Question.Type, levels = c("V", "A", "W"))
+
+```
+
+
+
+### Simple Stress Labeling: PP, HR.E4, HR.AW,  HRVNorm 
+
+
+```{r Test, include=FALSE}
+library(dplyr)
+
+# 2) Join stats back, label stress, drop any missing physiology, and set factor levels
+Qlevel_Simpl_Stress <- Qlevel %>%
+  mutate(
+    Stress.pp   = factor(if_else(PPNorm    > PPNorm_mean,    "S", "NS"), levels = c("NS","S")),
+    Stress.hre4 = factor(if_else(HR.E4Norm  > HR.E4Norm_mean,  "S", "NS"), levels = c("NS","S")),
+    Stress.hraw = factor(if_else(HR.AWNorm  > HR.AWNorm_mean,  "S", "NS"), levels = c("NS","S")),
+    Stress.nhrv = factor(if_else(HRVNorm    < HRVNorm_mean,    "S", "NS"), levels = c("NS","S")),
+
+    Gender      = factor(Gender, levels = c("F","M")),
+    QType       = factor(QType,  levels = c("V","A","W"))
+  )
+
+# 3) (Optional) Inspect how many, if any, rows were dropped due to missing physiology
+n_before <- nrow(Qlevel)
+n_after  <- nrow(Qlevel_Simpl_Stress)
+cat(glue::glue("Dropped {n_before - n_after} rows with missing physiology."))
+
+# Done: Qlevel_Simpl_Stress now has all your means, sds, medians, n, 
+#      plus four clean Stress.* factors and properly‐leveled Gender/QType.
+
+colSums(!is.na(Qlevel_Simpl_Stress))
+
+```
+
+
+
+## Qlevel QQ plots for all participants
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+# Plot for PPNorm
+PP_stress_qq_all <- ggqqplot(Qlevel_Simpl_Stress$PPNorm,
+  ylab = "", xlab = "",
+  main = TeX(r'($\bar{\textit{NFP}}$)'),
+  ggtheme = my_theme1
+)
+
+n_PPNorm <- sum(!is.na(Qlevel_Simpl_Stress$PPNorm))
+PP_stress_qq_all <- PP_stress_qq_all + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n_PPNorm)
+                   )
+  
+
+# Plot for HR.AW
+HR_AW_stress_qq_all <- ggqqplot(Qlevel_Simpl_Stress$HR.AWNorm,
+  ylab = "", xlab = "",
+  main = TeX(r'($\bar{\textit{NHR}}_{AW}$)'),
+  ggtheme = my_theme1
+)
+
+n_HRAWNorm <- sum(!is.na(Qlevel_Simpl_Stress$HR.AWNorm))
+HR_AW_stress_qq_all <- HR_AW_stress_qq_all + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n_HRAWNorm)
+                   )
+
+
+# Plot for HR.E4
+HR_E4_stress_qq_all <- ggqqplot(Qlevel_Simpl_Stress$HR.E4Norm,
+  ylab = "", xlab = "",
+  main = TeX(r'($\bar{\textit{NHR}}_{E4}$)'),
+  ggtheme = my_theme1
+)
+
+n_HRE4Norm <- sum(!is.na(Qlevel_Simpl_Stress$HR.E4Norm))
+HR_E4_stress_qq_all <- HR_E4_stress_qq_all + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n_HRE4Norm)
+                   )
+
+# Plot for HR.IBINorm
+NHRV_stress_qq_all <- ggqqplot(Qlevel_Simpl_Stress$HRVNorm,
+  ylab = "", xlab = "",
+  main = TeX(r'(\bar{\textit{NHRV}})'),
+  ggtheme = my_theme1
+)
+
+n_HRVNorm <- sum(!is.na(Qlevel_Simpl_Stress$HRVNorm))
+NHRV_stress_qq_all <- NHRV_stress_qq_all + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n_HRVNorm)
+                   )
+
+grid.arrange(PP_stress_qq_all ,HR_E4_stress_qq_all, HR_AW_stress_qq_all,NHRV_stress_qq_all, ncol = 4)
+
+```
+
+
+
+
+
+## S002 - Stress Threshold Visualization, QQPlots, Table
+```{r stress_threshold_viz_t001, echo=FALSE, fig.height=10, fig.width=7}
+library(qqplotr)
+
+# PP_unit <- "°C$^2$"
+# HR_unit = "BPM" # both HR E4 and AW are in BPM
+# HRV_unit = "s"
+
+# # build the full y‐label string
+# pp_y_lab <- sprintf("$\\bar{\\Delta \\textit{EDA}}_{f}$ \\[%s\\]", PP_unit)
+# hre4_y_lab = sprintf("$\\bar{\\Delta \\textit{HR}}_{E4 }$ [%s]", HR_unit)
+# hraw_y_lab = sprintf("$\\bar{\\Delta \\textit{HR}}_{AW }$ [%s]", HR_unit)
+# hrv_y_lab = sprintf("$\\bar{\\Delta \\textit{HRV}}$ [%s]", HRV_unit)
+
+# All variables are scaled. 
+PP_unit <- "scaled"
+HR_unit = "scaled" 
+HRV_unit = "scaled"
+
+# build the full y‐label string
+pp_y_lab <- sprintf("$\\bar{ \\textit{NFP}}$ ")
+pp_y_lab <- sprintf("$\\bar{ \\textit{NFP}}$ ")
+hraw_y_lab = sprintf("$\\bar{ \\textit{NHR}}_{AW }$ ")
+hre4_y_lab = sprintf("$\\bar{ \\textit{NHR}}_{E4 }$ ")
+hrv_y_lab = sprintf("$\\bar{ \\textit{NHRV}}$ ")
+
+
+
+mycolors_stress <- c(NS = "green", S = "red")
+
+PID_num <- 2
+PID <- sprintf("S%03d", PID_num)
+
+Qlevel_Simpl_Stress_PID <- Qlevel_Simpl_Stress %>%
+  filter(ParticipantID %in% PID)
+
+
+ylims_pID <- c(0, 4)
+
+library(grid)   # for unit()
+
+PP_stress_hist <- Qlevel_Simpl_Stress_PID %>%
+  #mutate(PPNorm_mean = mean(PPNorm, na.rm = TRUE)) %>%
+  ggplot(aes(x = PPNorm, fill = Stress.pp)) +
+    geom_histogram(position = "dodge") +
+    scale_fill_manual(
+      values = alpha(mycolors_stress, 0.9),
+      name   = sprintf("S%03d", PID_num),
+      labels = c("RLS", "RHS"),
+      guide  = guide_legend(
+        keywidth  = unit(1.2, "cm"),  # widen each key
+        keyheight = unit(0.5, "cm"),  # (optional) adjust height
+        nrow = 1                      # keep items in one row
+      )
+    ) +
+    geom_vline(aes(xintercept = PPNorm_mean),
+               color    = "blue",
+               linetype = 3,
+               linewidth = 1) +
+    labs(y = TeX(pp_y_lab), x = NULL) +
+    my_theme1 +
+    theme(
+      strip.background   = element_rect(fill = "white", color = "black"),
+      legend.title       = element_text(size = 14),
+      legend.text        = element_text(size = 14),
+      legend.spacing.x   = unit(1, "cm"),  # extra space between items
+    )
+
+
+
+HR_AW_stress_hist <- Qlevel_Simpl_Stress_PID %>%
+  #filter(ParticipantID %in% PID) %>%
+  ggplot(aes(x = HR.AWNorm, fill = Stress.hraw)) +
+  scale_fill_manual(values = alpha(mycolors_stress, 0.9)) +
+  #scale_y_continuous(limits = ylims_pID, guide = "none") + # "none" removes the y-axis ticks and labels
+  scale_y_continuous(limits = ylims_pID) + # "none" removes the y-axis ticks and labels
+   #geom_histogram( position = "dodge", binwidth = 0.05) +
+  geom_histogram(position = "dodge") +
+  #  facet_wrap(~ParticipantID, ncol = 1) +
+  my_theme1 +
+  labs(
+    y = TeX(hraw_y_lab),
+    x = "", title = NULL
+  ) +
+  geom_vline(aes(xintercept = HR.AWNorm_mean), color = "blue", linetype = 3, linewidth = 1)
+
+
+
+HR_E4_stress_hist <- Qlevel_Simpl_Stress_PID %>%
+  #filter(ParticipantID %in% PID) %>%
+  ggplot(aes(x = HR.E4Norm, fill = Stress.hre4)) +
+  scale_fill_manual(values = alpha(mycolors_stress, 0.9)) +
+  scale_y_continuous(limits = ylims_pID) + # "none" removes the y-axis ticks and labels
+  # geom_histogram( position = "dodge", binwidth = 1) +
+  geom_histogram(position = "dodge") +
+  #  facet_wrap(~ParticipantID, ncol = 1) +
+  my_theme1 +
+  labs(
+    y = TeX(hre4_y_lab),
+    x = "", title = NULL
+  ) +
+  geom_vline(aes(xintercept = HR.E4Norm_mean), color = "blue", linetype = 3, linewidth = 1)
+
+
+
+
+
+NHRV_stress_hist <-  Qlevel_Simpl_Stress_PID %>%
+  #filter(ParticipantID %in% PID) %>%
+  ggplot(aes(x = HRVNorm, fill = Stress.nhrv)) +
+  scale_fill_manual(values = alpha(mycolors_stress, 0.9)) +
+  geom_histogram(position = "dodge") +
+  my_theme1 +
+  labs(
+    y = TeX(hrv_y_lab),
+    x = "", title = NULL
+  ) +
+  geom_vline(aes(xintercept = HRVNorm_mean), color = "blue", linetype = 3, linewidth = 1)
+
+
+ # PID_hists <- ggarrange(PP_stress_hist,HR_AW_stress_hist, HR_E4_stress_hist, NHRV_stress_hist, ncol = 4, common.legend = TRUE, legend = "top")
+ 
+ 
+
+
+
+# Plot for PPNorm
+PP_stress_qq <- ggqqplot(Qlevel_Simpl_Stress_PID$PPNorm,
+  ylab = "", xlab = "",
+  #main = TeX(r'($\bar{\Delta \textit{EDA}}_{f}$ [°C$^2$])'),
+  ggtheme = my_theme1
+)
+
+n <- sum(!is.na(Qlevel_Simpl_Stress_PID$PPNorm))
+PP_stress_qq <- PP_stress_qq + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n)
+                   )
+  
+  
+# Plot for HR.E4
+HRAW_stress_qq <- ggqqplot(Qlevel_Simpl_Stress_PID$HR.AWNorm,
+  ylab = "", xlab = "",
+  #main = TeX(r'(\bar{$\Delta\textit{HR}}_{E4 }$  \[BPM\])'),
+  ggtheme = my_theme1
+)
+
+
+n <- sum(!is.na(Qlevel_Simpl_Stress_PID$HR.AWNorm))
+HRAW_stress_qq <- HRAW_stress_qq + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n)
+                   )
+  
+
+
+# Plot for HR.E4
+HRE4_stress_qq <- ggqqplot(Qlevel_Simpl_Stress_PID$HR.E4Norm,
+  ylab = "", xlab = "",
+  #main = TeX(r'(\bar{$\Delta\textit{HR}}_{E4 }$  \[BPM\])'),
+  ggtheme = my_theme1
+)
+
+n <- sum(!is.na(Qlevel_Simpl_Stress_PID$HR.E4Norm))
+HRE4_stress_qq <- HRE4_stress_qq + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n)
+                   )
+
+
+# Plot for HR.IBINorm
+NHRV_stress_qq <- ggqqplot(Qlevel_Simpl_Stress_PID$HRVNorm,
+  ylab = "", xlab = "",
+  #main = TeX(r'(\bar{\textit{NHRV}} [s])'),
+  ggtheme = my_theme1
+)
+
+n <- sum(!is.na(Qlevel_Simpl_Stress_PID$HRVNorm))
+NHRV_stress_qq <- NHRV_stress_qq + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n)
+                   )
+
+
+final <- ggpubr::ggarrange(
+  # row1
+  PP_stress_hist,  PP_stress_qq,
+  # row2
+  HR_AW_stress_hist, HRAW_stress_qq,
+  # row3
+  HR_E4_stress_hist, HRE4_stress_qq,
+  # row4
+  NHRV_stress_hist,  NHRV_stress_qq,
+
+  ncol           = 2,
+  nrow           = 4,
+  common.legend  = TRUE,
+  legend         = "top"     # ← puts legend above the whole grid
+)
+
+
+final
+
+if (is_save) {
+  ggsave(
+  filename = sprintf("%sFigure7.pdf", plot_dir),
+    plot     = final,
+    width    = 7,
+    height   = 10,
+    dpi      = 300
+  )
+}
+
+```
+
+
+
+
+
+
+
+
+# Stress MODELs 
+*Qlevel stress labeling (Mean is threshold) on PP, HR_E4, HR_AW , HRV Channel*
+
+```{r include=FALSE}
+names(Qlevel_Simpl_Stress)
+str(Qlevel_Simpl_Stress)
+
+Qlevel_Stress_Simple <- Qlevel_Simpl_Stress %>%
+  rename(
+    Participant = ParticipantID,
+    QType = QType,
+    QName = Question.Name,
+    Stress.Pp = Stress.pp,
+    Stress.HrE4 = Stress.hre4, # HRE4
+    Stress.HrAW = Stress.hraw, # HRAW
+    Stress.Hrv = Stress.nhrv # HRVNorm
+  )
+
+names(Qlevel_Stress_Simple)
+```
+
+### Correlation Matrix - Stress Labels and quantitative variables
+```{r fig.height=8, fig.width=8, message=FALSE, warning=FALSE}
+# colnames(Qlevel_Stress_Simple)
+# str(Qlevel_Stress_Simple)
+library(ggcorrplot)
+reduced_data <-
+  subset(Qlevel_Stress_Simple, select = c(
+    Perspiration,
+    HR.E4,
+    HR.AW,
+    Stress.Pp,
+    Stress.HrE4,
+    Stress.HrAW,
+    Stress.Hrv
+  )) #
+
+
+#colSums(is.na(reduced_data))
+
+model.matrix(~., data = reduced_data) %>%
+  cor(use = "everything") %>%
+  ggcorrplot(show.diag = FALSE, type = "lower", lab = TRUE) +
+  ggtitle("Correlation Matrix with Best HR")
+```
+
+
+
+# Model 1 - PP_Stress - PPNorm Logistic Regression Mixed Effects Model
+## Correlation Model Matrix
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+reduced_data <- subset(Qlevel_Stress_Simple, select = c(Grade, Gender, QType, SAI, PPNorm, Stress.Pp))
+
+model.matrix(~., data = reduced_data) %>%
+  cor(use = "everything") %>%
+  ggcorrplot(show.diag = FALSE, type = "lower", lab = TRUE)
+```
+
+## Full Model
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+# Fit the model
+Stress.PP.fit.full <- glmer(Stress.Pp ~ 1 + Grade + Gender + QType + scale(SAI) + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.PP.fit.full)
+
+summ(Stress.PP.fit.full, digits = 4)
+```
+
+
+## Remove Gender
+
+```{r warning=FALSE}
+# Fit the model
+Stress.PP.fit.fm <- glmer(Stress.Pp ~ 1 +  Grade + QType + scale(SAI) + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.PP.fit.fm)
+summ(Stress.PP.fit.fm, digits = 4)
+```
+
+## Remove Grade - Optimal PP Stress Model
+
+```{r warning=FALSE}
+# Fit the model
+Stress.PP.fit.fm <- glmer(Stress.Pp ~ 1 +  QType + scale(SAI) + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.PP.fit.fm)
+summ(Stress.PP.fit.fm, digits = 4)
+```
+
+
+## Remove SAI ? 
+*No, AIC is getting bigger*
+
+```{r SAI test, warning=FALSE}
+# Fit the model
+Stress.PP.fit.fm_test <- glmer(Stress.Pp ~ 1 +  QType  + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.PP.fit.fm_test)
+summ(Stress.PP.fit.fm_test, digits = 4)
+```
+
+
+
+### Fixed Effects Visualization of Stress Model - PP
+```{r fig.height=4.5, fig.width=7}
+m.plot.stress_pp <- sjPlot::plot_model(Stress.PP.fit.fm,
+  show.values = TRUE, show.p = TRUE,
+  value.offset = 0.1,
+  #axis.labels = c("QC[W]", "QC[A]"),
+  title = ""
+) + my_theme1
+
+m.plot.stress_pp$layers[[4]]$aes_params$vjust <- (0.1)
+m.plot.stress_pp$layers[[4]]$aes_params$hjust <- (-0.1)
+
+m.plot.stress_pp
+```
+
+
+
+
+### Stress PP Final Model Predictors Plot
+
+```{r echo=FALSE}
+pp_final_grade.qt.pm <- fm_plot_func(Stress.PP.fit.fm, term = "QType" , ymin = 0.15, ymax = 0.7)
+# Remove legend from main plot and add title
+pp_final_grade.qt.pm <- pp_final_grade.qt.pm + 
+  theme(legend.position = "none") + ggtitle(TeX(r'(Stress via \textit{$EDA_f$})'))
+
+pp_final_sai.pm <- fm_plot_func(Stress.PP.fit.fm, term = "SAI", ymin = 0.15, ymax = 0.7)
+
+
+# Arrange plot and legend together
+final_plot <- cowplot::plot_grid(pp_final_grade.qt.pm,  pp_final_sai.pm, 
+                                 ncol = 2, 
+                                 rel_heights = c(4, 4))
+
+final_plot = cowplot::plot_grid(final_plot, mylegend, nrow = 2, rel_heights = c(4, 1))
+
+# Print the final plot
+print(final_plot)
+```
+
+
+
+# Model 2 -  HRAW_Stress - HRAWNorm Logistic Regression Mixed Effects Model
+## Correlation Model Matrix
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+reduced_data <- subset(Qlevel_Stress_Simple, select = c(Grade, Gender, QType, SAI, HR.AW, Stress.HrAW))
+
+model.matrix(~., data = reduced_data) %>%
+  cor(use = "everything") %>%
+  ggcorrplot(show.diag = FALSE, type = "lower", lab = TRUE)
+```
+
+## Full Model
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Fit the model
+Stress.HR.fit.full <- glmer(Stress.HrAW ~ 1 + Grade + Gender + QType + scale(SAI) + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HR.fit.full)
+
+summ(Stress.HR.fit.full, digits = 4)
+```
+
+## Remove SAI
+
+```{r}
+# Fit the model
+Stress.HRAW.fit.fm <- glmer(Stress.HrAW ~ 1 + Grade + Gender + QType + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HRAW.fit.fm)
+
+summ(Stress.HRAW.fit.fm, digits = 4)
+```
+
+## Remove Gender
+
+```{r}
+# Fit the model
+Stress.HRAW.fit.fm <- glmer(Stress.HrAW ~ 1 + Grade + QType + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HRAW.fit.fm)
+
+summ(Stress.HRAW.fit.fm, digits = 4)
+```
+
+
+### Fixed Effects Visualization of Stress Model - HRAW
+```{r fig.height=4.5, fig.width=7}
+m.plot.stress_hr <- sjPlot::plot_model(Stress.HRAW.fit.fm,
+  show.values = TRUE, show.p = TRUE,
+  #axis.labels = c("QC[W]", "QC[A]"),
+  value.offset = 0.1,
+  title = ""
+) + my_theme1 #+theme_bw()
+
+m.plot.stress_hr$layers[[4]]$aes_params$vjust <- (0.1)
+m.plot.stress_hr$layers[[4]]$aes_params$hjust <- (-0.1)
+
+m.plot.stress_hr
+```
+
+\newpage
+
+### Stress HRAW Final Model Predictors Plot
+
+```{r fig.height=5, fig.width=6}
+hr_aw_final_grade.qt.pm <- fm_plot_func(Stress.HRAW.fit.fm, term = "QType", ymin = 0.15, ymax = 0.7)
+# Remove legend from main plot and add title
+hr_aw_final_grade.qt.pm <- hr_aw_final_grade.qt.pm + theme(legend.position = "none") +
+  ggtitle(TeX(r'(Stress via \textit{$HR AW$})'))
+
+
+
+hr_aw_final_grade.pm <- fm_plot_func(Stress.HRAW.fit.fm, term = "Grade", ymin = 0.15, ymax = 0.7)
+# Remove legend from main plot and add title
+hr_aw_final_grade.pm <- hr_aw_final_grade.pm + theme(legend.position = "none") +
+  ggtitle(TeX(r'(\textit{$Grade$})'))
+
+
+# Arrange plot and legend together
+final_plot_hr_aw_grid <- cowplot::plot_grid(hr_aw_final_grade.qt.pm,  hr_aw_final_grade.pm, 
+                                 ncol = 2, 
+                                 rel_heights = c(4, 4),
+                                 align = "h") 
+
+final_plot = cowplot::plot_grid(final_plot_hr_aw_grid, mylegend, nrow = 2, rel_heights = c(4, 1))
+
+# Print the final plot
+print(final_plot)
+
+
+```
+
+# Model 3 -  HRE4_Stress Stress - HRE4Norm Logistic Regression Mixed Effects Model
+## Correlation Model Matrix
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+reduced_data <- subset(Qlevel_Stress_Simple, select = c(Grade, Gender, QType, SAI, HR.E4, Stress.HrE4))
+
+model.matrix(~., data = reduced_data) %>%
+  cor(use = "everything") %>%
+  ggcorrplot(show.diag = FALSE, type = "lower", lab = TRUE)
+```
+
+## Logistic Regression Mixed Effects Model of Stress - HR E4
+### Full Model
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Fit the model
+Stress.HR.fit.full <- glmer(Stress.HrE4 ~ 1 + Grade + Gender + QType + scale(SAI) + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HR.fit.full)
+
+summ(Stress.HR.fit.full, digits = 4)
+```
+
+## Remove SAI
+
+```{r}
+# Fit the model
+Stress.HRE4.fit.fm <- glmer(Stress.HrE4 ~ 1 + Grade + Gender + QType  + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HRE4.fit.fm)
+
+summ(Stress.HRE4.fit.fm, digits = 4)
+```
+
+## Remove Gender - Optimal HR E4 Stress Model
+
+```{r}
+# Fit the model
+Stress.HRE4.fit.fm <- glmer(Stress.HrE4 ~ 1 + Grade  + QType  + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HRE4.fit.fm)
+
+summ(Stress.HRE4.fit.fm, digits = 4)
+```
+
+
+
+
+### Fixed Effects Visualization of Stress Model - HR E4
+
+```{r fig.height=4.5, fig.width=7}
+m.plot.stress_hr <- sjPlot::plot_model(Stress.HRE4.fit.fm,
+  show.values = TRUE, show.p = TRUE,
+  #axis.labels = c("QC[W]", "QC[A]"),
+  value.offset = 0.1,
+  title = ""
+) + my_theme1 #+theme_bw()
+
+m.plot.stress_hr$layers[[4]]$aes_params$vjust <- (0.1)
+m.plot.stress_hr$layers[[4]]$aes_params$hjust <- (-0.1)
+
+m.plot.stress_hr
+```
+
+\newpage
+
+### Stress HRE4 Final Model Predictors Plot
+
+```{r fig.height=5, fig.width=6}
+hr_e4_final_grade.qt.pm <- fm_plot_func(Stress.HRE4.fit.fm, term = "QType", ymin = 0.15, ymax = 0.7)
+# Remove legend from main plot and add title
+hr_e4_final_grade.qt.pm <- hr_e4_final_grade.qt.pm + theme(legend.position = "none") +
+  ggtitle(TeX(r'(Stress via \textit{$HR E4$})'))
+
+
+hr_e4_final_grade.pm <- fm_plot_func(Stress.HRE4.fit.fm, term = "Grade", ymin = 0.15, ymax = 0.7)
+
+# Remove legend from main plot and add title
+hr_e4_final_grade.pm <- hr_e4_final_grade.pm + theme(legend.position = "none") +
+  ggtitle(TeX(r'(\textit{$Grade$})'))
+
+
+# Arrange plot and legend together
+final_plot <- cowplot::plot_grid(hr_e4_final_grade.qt.pm,  hr_e4_final_grade.pm, 
+                                 ncol = 2, 
+                                 rel_heights = c(4, 4))
+
+final_plot = cowplot::plot_grid(final_plot, mylegend, nrow = 2, rel_heights = c(4, 1))
+
+# Print the final plot
+print(final_plot)
+
+
+
+```
+
+
+# Model 4 -  HRV_Stress - HRVNorm Logistic Regression Mixed Effects Model
+
+## Correlation Model Matrix
+
+```{r fig.height=10, fig.width=10, message=FALSE, warning=FALSE}
+reduced_data <- subset(Qlevel_Stress_Simple, select = c(Grade, Gender, QType, SAI, HR.AW, Stress.Hrv))
+
+model.matrix(~., data = reduced_data) %>%
+  cor(use = "everything") %>%
+  ggcorrplot(show.diag = FALSE, type = "lower", lab = TRUE)
+```
+
+## Full Model
+```{r warning=FALSE}
+
+# Fit the model
+Stress.HRV.fit.full <- glmer(Stress.Hrv ~ 1 + Grade + Gender + QType + scale(SAI) + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+
+summary(Stress.HRV.fit.full)
+summ(Stress.HRV.fit.full, digits = 4)
+```
+
+## Remove SAI
+```{r warning=FALSE}
+# Fit the model
+Stress.HRV.fit.fm <- glmer(Stress.Hrv ~ 1 + Grade + Gender + QType  + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+
+summary(Stress.HRV.fit.fm)
+summ(Stress.HRV.fit.fm, digits = 4)
+```
+
+## Remove Gender - Optimal HRV Stress Model
+```{r warning=FALSE}
+# Fit the model
+Stress.HRV.fit.fm <-glmer(Stress.Hrv ~ 1 + Grade + QType  + (1 | Participant), data = Qlevel_Stress_Simple, family = binomial(link = "logit"))
+
+summary(Stress.HRV.fit.fm)
+summ(Stress.HRV.fit.fm, digits = 4)
+```
+
+### Fixed Effects Visualization of Stress Model - NHRV
+```{r fig.height=4.5, fig.width=7}
+m.plot.stress_hrv <- sjPlot::plot_model(Stress.HRV.fit.fm,
+  show.values = TRUE, show.p = TRUE,
+  #axis.labels = c("QC[W]", "QC[A]", "SAI"),
+  value.offset = 0.1,
+  title = ""
+) + my_theme1 #+theme_bw()
+
+m.plot.stress_hrv$layers[[4]]$aes_params$vjust <- (0.1)
+m.plot.stress_hrv$layers[[4]]$aes_params$hjust <- (-0.1)
+
+m.plot.stress_hrv
+```
+
+\newpage
+### Stress Hrv Final Model Predictors Plot
+
+```{r fig.height=5, fig.width=6}
+hrv_final_grade.qt.pm <- fm_plot_func(Stress.HRV.fit.fm, term = "QType", ymin = 0.15, ymax = 0.7)
+# Remove legend from main plot and add title
+hrv_final_grade.qt.pm <- hrv_final_grade.qt.pm + theme(legend.position = "none") +
+  ggtitle(TeX(r'(Stress via \textit{$HRV$})'))
+
+
+hrv_final_grade.pm <- fm_plot_func(Stress.HRV.fit.fm, term = "Grade", ymin = 0.15, ymax = 0.7)
+
+# Remove legend from main plot and add title
+hrv_final_grade.pm <- hrv_final_grade.pm + theme(legend.position = "none") +
+  ggtitle(TeX(r'(\textit{$Grade$})'))
+
+
+# Arrange plot and legend together
+final_plot <- cowplot::plot_grid(hrv_final_grade.qt.pm,  hrv_final_grade.pm, 
+                                 ncol = 2, 
+                                 rel_heights = c(4, 4))
+
+final_plot = cowplot::plot_grid(final_plot, mylegend, nrow = 2, rel_heights = c(4, 1))
+
+# Print the final plot
+print(final_plot)
+
+
+```
+
+
+
+# Logistic-Regression-StressModels
+
+```{r 2-Logistic-Regression-Plots, echo=FALSE, fig.height=12, fig.width=12}
+# QType, Grade, SAI
+
+pp_final_grade.qt.pm <- pp_final_grade.qt.pm + ggtitle(TeX("\\textit{QTYPE}"))
+pp_final_sai.pm <- pp_final_sai.pm + ggtitle( TeX("\\textit{$SAI$}"))
+hr_aw_final_grade.qt.pm <- hr_aw_final_grade.qt.pm + ggtitle("") 
+hr_aw_final_grade.pm <- hr_aw_final_grade.pm +ggtitle( TeX("\\textit{QGRADE}")) + theme()
+hr_e4_final_grade.qt.pm <- hr_e4_final_grade.qt.pm + ggtitle("")
+hr_e4_final_grade.pm <- hr_e4_final_grade.pm + ggtitle("")
+hrv_final_grade.qt.pm <- hrv_final_grade.qt.pm + ggtitle("")
+hrv_final_grade.pm <- hrv_final_grade.pm + ggtitle("")
+
+
+#PP row
+row1 <- cowplot::plot_grid(
+  pp_final_grade.qt.pm, pp_final_sai.pm,
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("b1", ""),
+  label_size = 20
+)
+
+#HR AW row
+row2 <- cowplot::plot_grid(
+  hr_aw_final_grade.qt.pm, hr_aw_final_grade.pm,
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("b2", ""),
+  label_size = 20
+)
+
+#HR E4 row
+row3 <- cowplot::plot_grid(
+  hr_e4_final_grade.qt.pm, hr_e4_final_grade.pm,
+
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("b3", ""),
+  label_size = 20
+)
+
+# HRV row
+row4 <- cowplot::plot_grid(
+hrv_final_grade.qt.pm, hrv_final_grade.pm, 
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("b4", ""),
+  label_size = 20
+)
+
+
+# --- 2. assume you already have this from before: ---
+final_5M <- cowplot::plot_grid(
+  row1, row2, row3, row4, mylegend,
+  nrow = 5,
+  rel_heights = c(1, 1, 1, 1, 0.1)
+)
+
+
+#final_5M 
+
+
+```
+
+
+
+```{r echo=FALSE, fig.height=12, fig.width=10}
+library(cowplot)
+
+# # 1. build the top header
+# title_row <- ggdraw() +
+#   draw_label("QTYPE", x = 1.3/7, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   draw_label("QGRADE",         x = 3/6, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   draw_label("SAI",           x = 5/6, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   theme_void()
+
+# 2. build the right‐hand strip
+
+
+
+# define band‐height and gap
+h <- 0.20   # 20% of panel height
+g <- 0.05   # 5% gap between bands
+
+right_strip <- ggdraw() +
+  # PP band: spans y = 0.80 → 1.00  
+  draw_grob(
+    grob   = grid::rectGrob(gp = grid::gpar(fill = "grey90", col = NA)),
+    x      = 0,
+    y      = 1 - h,
+    width  = 1,
+    height = h
+  ) +
+  # HR E4 band: spans y = 0.55 → 0.75  
+  draw_grob(
+    grob   = grid::rectGrob(gp = grid::gpar(fill = "grey90", col = NA)),
+    x      = 0,
+    y      = 1 - (2*h + g),
+    width  = 1,
+    height = h
+  ) +
+  # HR AW band: spans y = 0.30 → 0.50  
+  draw_grob(
+    grob   = grid::rectGrob(gp = grid::gpar(fill = "grey90", col = NA)),
+    x      = 0,
+    y      = 1 - (3*h + 2*g),
+    width  = 1,
+    height = h
+  ) +
+  # HRV band: spans y = 0.05 → 0.25  
+  draw_grob(
+    grob   = grid::rectGrob(gp = grid::gpar(fill = "grey90", col = NA)),
+    x      = 0,
+    y      = 1 - (4*h + 3*g),
+    width  = 1,
+    height = h
+  ) +
+  # labels on top of each band
+  draw_label("FP",    x = 1, y = 0.90, angle = -90, fontface = "bold", vjust = 2) +
+  draw_label("HR AW", x = 1, y = 0.65, angle = -90, fontface = "bold", vjust = 2) +
+  draw_label("HR E4", x = 1, y = 0.40, angle = -90, fontface = "bold", vjust = 2) +
+  draw_label("HRV",   x = 1, y = 0.15, angle = -90, fontface = "bold", vjust = 2) +
+  theme_void()
+
+
+# 3. glue grid + strip side‐by‐side
+middle <- cowplot::plot_grid(
+  final_5M,
+  right_strip,
+  ncol        = 2,
+  rel_widths  = c(0.95, 0.05)
+)
+
+```
+
+```{r echo=FALSE, fig.height=11, fig.width=8}
+
+middle
+#Save the final_5M plot
+ggsave(
+  filename = sprintf("%sFigure12.pdf", plot_dir), # 2-Logistic-Regression-Plots
+  
+  plot = middle,
+  width = 8,
+  height = 11,
+  dpi = 300
+)
+```
+
+\newpage
+
+# Paper Table II
+
+```{r}
+summ(Stress.PP.fit.fm, digits = 3)$model@call
+M1_table = summ(Stress.PP.fit.fm, digits = 3)$coeftable
+
+summ(Stress.HRAW.fit.fm, digits = 3)$model@call
+M2_table = summ(Stress.HRAW.fit.fm, digits = 3)$coeftable
+
+summ(Stress.HRE4.fit.fm, digits = 3)$model@call
+M3_table = summ(Stress.HRE4.fit.fm, digits = 3)$coeftable
+
+
+summ(Stress.HRV.fit.fm, digits = 3)$model@call
+M4_table = summ(Stress.HRV.fit.fm, digits = 3)$coeftable
+
+
+merge <- rbind(M1_table, M2_table, M3_table, M4_table)
+
+
+```
+
+
+```{r model-table, include=FALSE, results='asis'}
+library(dplyr)
+library(purrr)
+library(knitr)
+
+# 1) Put your models in a named list
+models <- list(
+  fEDA  = Stress.PP.fit.fm,
+  HR_AW = Stress.HRAW.fit.fm,
+  HR_E4 = Stress.HRE4.fit.fm,
+  HRV   = Stress.HRV.fit.fm
+)
+
+# 2) extract each summary(...$coefficients) into a data.frame
+coef_dfs <- lapply(models, function(mod) {
+  co <- summ(mod, digits = 3)$coeftable
+  #as.data.frame(co, stringsAsFactors = FALSE)
+  as.data.frame(co, stringsAsFactors = FALSE) #%>% dplyr::select(-4)
+})
+
+
+# 1) figure out every predictor that appears in any model
+all_preds <- unique(unlist(lapply(coef_dfs, rownames)))
+
+# 2) for each df, turn rownames into a column, 
+#    re-order to 'all_preds', and then put rownames back
+aligned <- lapply(coef_dfs, function(df) {
+  df2 <- as.data.frame(df, stringsAsFactors=FALSE)
+  df2$Predictor <- rownames(df2)
+  
+  # reorder (and insert NA rows for missing preds)
+  df2 <- df2[match(all_preds, df2$Predictor), , drop=FALSE]
+  
+  # restore rownames
+  rownames(df2) <- all_preds
+  df2
+})
+
+# 4) now cbind them
+merged <- do.call(cbind, aligned)
+
+# 5) restore a single Predictor column in front
+merged <- cbind(Predictor = rownames(merged), merged, row.names=NULL)
+
+
+# Select all columns that end with ".Est." and drop them
+Est_all <- merged %>% dplyr::select(Predictor,ends_with(".Est."))
+SE_all <- merged %>% dplyr::select(Predictor,ends_with(".S.E."))
+t_all <- merged %>% dplyr::select(Predictor,ends_with(".z val."))
+p_all <- merged %>% dplyr::select(Predictor,ends_with(".p"))
+
+paper_merged <- cbind(Est_all, SE_all[, -1], t_all[, -1], p_all[, -1])
+```
+
+
+```{r merged-table, results='asis', echo=FALSE}
+# 2) Build your header labels
+stat_labels  <- c("Est", "S.E.", "z", "p")
+# bottom row: model names repeated under each stat
+model_names  <- c("fEDA", "HRAW", "HRE4", "HRV")
+var_labels   <- rep(model_names, times = length(stat_labels))
+
+# define a very light and a medium light gray
+light_gray  <- if (knitr::is_latex_output()) "gray!25" else "#E6E6E6"
+medium_gray <- if (knitr::is_latex_output()) "gray!50" else "#CCCCCC"
+
+
+paper_merged %>%  
+  mutate(
+    across(
+      ends_with(".p"),
+      ~ round(., 3)
+    )
+  ) %>%
+  mutate(
+    across(
+      ends_with(".p"),
+      ~ format.pval(., digits = 3, eps = 0.001)
+    )
+  ) %>%  mutate(
+    across(
+      ends_with(".z val"),
+      ~ round(., 3)
+    )
+  ) %>%  kable(
+  digits = 3,
+  format          = "html",
+  #format          = "latex",
+  booktabs        = TRUE,
+  escape          = TRUE,
+  table.placement = "H",
+  col.names       = c("Predictor", var_labels),
+  align           = c("l", rep("r", length(var_labels)))
+) %>%
+  add_header_above(
+    header = c(
+      " "    = 1,
+      "Coefficient $b.$"    = 4,
+      "$S.E.$" = 4,
+      "$z$ value" = 4,
+      "Pr(>$|z|$)"  = 4
+    ),
+    bold = TRUE
+  ) %>%
+  column_spec(c(3,7, 11,15),   background = light_gray) %>% # myGray
+  column_spec(c(5, 9, 13 ,17),   background = medium_gray) %>%  # gray 0.9
+  column_spec(c(4,6,8),   background = "white")    %>%
+  kable_styling(
+    latex_options = c("hold_position","scale_down"),
+    font_size     = 11
+  )
+```
+
+
+

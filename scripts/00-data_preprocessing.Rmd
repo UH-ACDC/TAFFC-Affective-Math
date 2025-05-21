@@ -1,0 +1,1608 @@
+---
+title: "Data Preprocessing"
+author: "Fettah Kiran"
+subtitle: "Data Preprocessing and Feature Engineering - N = 50 "
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    theme: united
+    number_sections: true 
+    mathjax: default
+  pdf_document: 
+    toc: true
+    number_sections: true 
+    keep_tex: true
+header-includes:
+  - \usepackage[table]{xcolor}
+  - \definecolor{myGray}{gray}{0.8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+------------------------------------------------------------------------
+
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+\newpage
+
+```{r include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+library(cowplot)
+library(ggpubr)
+library(readr)
+library(gridExtra)
+library(dplyr)
+library(tidyr)
+library(knitr)
+library(lattice)
+library(sjPlot)
+library(Matrix)
+require(ggpmisc) # for stat_poly_eq
+library(reshape2)
+library(kableExtra)
+library(latex2exp) # parses and converts LaTeX math formulas to R's plotmath expressions
+library(ggeffects)
+library(scales) ## scales::label_number()
+
+
+```
+
+
+```{r SpecialThemes, message=FALSE, warning=FALSE}
+
+
+# Load custom functions
+#browseURL("fm_plot_func.R")
+source("fm_plot_func.R")
+
+# options(digits=3)
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+
+my_theme_bold.italic <- my_theme + theme(text = element_text(size = 14, face = "bold"))
+
+data_dir = "../data/processed/" # data directory
+plot_dir = "../figures/" # plot directory
+
+is_save <- TRUE
+```
+
+\newpage
+# Read Data
+
+```{r readRawData, include=FALSE}
+N <- 50
+
+file_path_BL <- sprintf("%sAffective_Math_Dataset_N%s_BL.csv", data_dir, N)
+file_path_Exam <- sprintf("%sAffective_Math_Dataset_N%s_Exam.csv", data_dir, N)
+
+
+
+Df_BL <- read.csv(file_path_BL, header = TRUE, sep = ",")
+Df_Exam <- read.csv(file_path_Exam, header = TRUE, sep = ",", stringsAsFactors = T)
+
+names(Df_Exam)
+
+
+```
+
+```{r BaselineData, include=FALSE}
+# Baseline Data
+# Remove unnecessary columns
+Df_BL.SubSet <- subset(Df_BL,
+  select = c(ParticipantID, Time, Timestamp, Perspiration, HR.E4, HR.AW, HRV.IBI)
+)
+
+# Baseline new columns
+# Adding pp_log column to the data
+#Df_BL.SubSet["pp_log"] <- log(Df_BL.SubSet$Perspiration)
+
+# find all rows where one or the other is NA
+idx <- is.na(Df_BL.SubSet$HR.E4) | is.na(Df_BL.SubSet$HR.AW)
+
+# force both to NA in those rows
+Df_BL.SubSet$HR.E4[idx] <- NA
+Df_BL.SubSet$HR.AW[idx] <- NA
+
+
+# Baseline Means # Question level
+Df_BL.mean <- Df_BL.SubSet %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    Perspiration = round(mean(Perspiration, na.rm = T), 4),
+    HR.E4 = mean(HR.E4, na.rm = T),
+    HR.AW = mean(HR.AW, na.rm = T),
+    HRV.IBI = mean(HRV.IBI, na.rm = T)
+  )
+
+
+# if (is_save == TRUE) {
+#   # Save DF as csv file
+#   f_path <- sprintf("%sAffective_Math_Baseline_N%s.csv", data_dir, N)
+#   write_csv(Df_BL.mean, f_path)
+# }
+```
+
+## Before After Matching
+```{r ExamData, echo=FALSE}
+# Remove Examples
+Df_Exam <- Df_Exam[!Df_Exam$Question.Type == "Example", ]
+
+# Remove 2nd and 3rd attempts
+# Means that take the all first attempts
+Df_Exam <- Df_Exam[Df_Exam$Attempt == 1, ]
+
+# Remove NA in Question.Name
+Df_Exam <- Df_Exam[!is.na(Df_Exam$Question.Name), ]
+
+colnames(Df_Exam)
+
+# Remove unnecessary columns
+Df_Exam.SubSet <- subset(Df_Exam, select = -c( Timestamp))
+
+# show NAs in each column
+colSums(!is.na(Df_Exam.SubSet))
+
+## HRV Normalization, do it here since it requires HR E4
+Df_Exam.SubSet$HRV.IBINorm <- NA
+Df_Exam.SubSet$HRV.IBINorm <- round(Df_Exam.SubSet$HRV.IBI / Df_Exam.SubSet$HR.E4, 5)
+
+
+# Adding pp_log column to the data
+#Df_Exam.SubSet["pp_log"] <- log(Df_Exam.SubSet$Perspiration)
+
+Df_Exam.SubSet["HRE4Perf"] <- Df_Exam.SubSet$HR.E4
+# Add NAs to perfect where the AW has NAs
+Df_Exam.SubSet[is.na(Df_Exam.SubSet$HR.AW), ]$HRE4Perf <- NA
+
+
+print("Before matching")
+colSums(!is.na(Df_Exam.SubSet %>% dplyr::select(ParticipantID, Time, Question.Name, Question.Type, Perspiration,HR.E4, HR.AW,  HRV.IBI, HRV.IBINorm)))
+
+
+
+# find all rows where one or the other is NA
+idx <- is.na(Df_Exam.SubSet$HR.E4) | is.na(Df_Exam.SubSet$HR.AW)
+
+# force both to NA in those rows
+Df_Exam.SubSet$HR.E4[idx] <- NA
+Df_Exam.SubSet$HR.AW[idx] <- NA
+
+
+
+# Update the index after sync
+rownames(Df_Exam.SubSet) <- 1:nrow(Df_Exam.SubSet)
+
+Df_Exam.SubSet <- droplevels(Df_Exam.SubSet)
+
+#unique(Df_Exam.SubSet$Question.Type)
+
+print("After matching")
+colSums(!is.na(Df_Exam.SubSet %>% dplyr::select(ParticipantID, Time, Question.Name, Question.Type, Perspiration,HR.E4, HR.AW,  HRV.IBI, HRV.IBINorm)))
+
+
+```
+
+
+
+\newpage
+
+
+
+
+# Cook's Distance
+
+```{r}
+# 1) fit the model
+signal.lm.HRs <- lm(HR.E4 ~ HR.AW, data = Df_Exam.SubSet)
+
+# 2) compute Cook’s distances and 95% cutoff
+cooksD   <- cooks.distance(signal.lm.HRs)
+cooksD.95<- quantile(cooksD, prob = .95)
+
+# 3) identify the “influential” cases
+influential     <- cooksD[cooksD > cooksD.95]
+names_of_influential <- names(influential)
+
+# 4) optionally extract them if you still want the df_outlier
+df_outlier <- Df_Exam.SubSet[names_of_influential, ]
+
+# 5) ***REPLACE*** the anti_join step with direct indexing:
+Df_Exam.SubSet.afterCook <- Df_Exam.SubSet
+Df_Exam.SubSet.afterCook[ names_of_influential, c("HR.E4","HR.AW") ] <- NA
+
+# 6) restore simple row-numbers
+rownames(Df_Exam.SubSet.afterCook) <- seq_len(nrow(Df_Exam.SubSet.afterCook))
+
+# 7) diagnostics
+# summary(signal.lm.HRs)$r.squared
+
+cat(sprintf("Before Cook's Distance:"))
+colSums(!is.na(Df_Exam.SubSet))
+
+cat(sprintf("After Cook's Distance:"))
+colSums(!is.na(Df_Exam.SubSet.afterCook))
+
+```
+
+
+```{r CooksBfrAfter, echo=FALSE, fig.height=5, fig.width=10, warning=FALSE}
+# Plot Cook's Distance
+
+hr_limits <- c(50, 140)
+
+bfrCD.plot <- ggplot(Df_Exam.SubSet, aes(x = HR.E4, y = HR.AW)) +
+  geom_point() +
+  geom_abline(colour = "red") +
+  ylab(TeX("\\textit{$HR_{AW}$}  [bpm]")) +
+  xlab(TeX("\\textit{$HR_{E4}$}  [bpm]")) +
+  
+  theme(
+    text = element_text(size = 18, face = "bold"),
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    axis.text.y = element_text(size = 16)
+  ) +
+  
+  stat_correlation(mapping = use_label(c("n", "P", "R")), label.x = "left", size = 6) +
+  coord_cartesian(xlim = hr_limits, ylim = hr_limits)
+
+aftrCD.plot <- ggplot(Df_Exam.SubSet.afterCook, aes(x = HR.E4, y = HR.AW)) +
+  geom_point() +
+  geom_abline(colour = "red") +
+  ylab("") +   xlab(TeX("\\textit{$HR_{E4}$}  [bpm]")) +
+  theme(
+    text = element_text(size = 18, face = "bold"),
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+        axis.text.x = element_text(size = 16),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  ) +
+  stat_correlation(mapping = use_label(c("n", "P", "R")), label.x = "left", size = 6) +
+  coord_cartesian(xlim = hr_limits, ylim = hr_limits)
+
+
+bfr.aftr <- cowplot::plot_grid(
+  bfrCD.plot, aftrCD.plot,
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("a", "b"),
+  label_size = 20
+)
+
+bfr.aftr
+if (is_save == TRUE) {
+  path_name <- sprintf("%sFigure4.png", plot_dir)
+  ggsave(path_name, bfr.aftr, width = 10, height = 5)
+}
+
+```
+
+`r sprintf("* %s outlier data points (5%%) are removed with the Cook's Distance method", nrow(df_outlier))`
+
+
+```{r CreateNormalized normalize}
+
+Df_Exam.SubSet <- Df_Exam.SubSet.afterCook # if you want use the data before cook's distance, uncomment this line
+
+# initialize new normalize columns
+Df_Exam.SubSet$PPNorm <- NA
+Df_Exam.SubSet$HR.E4Norm <- NA
+Df_Exam.SubSet$HR.AWNorm <- NA
+
+
+for (p in unique(Df_Exam.SubSet$ParticipantID)) {
+  # PP Mean
+  # print(p)
+
+  colnames(Df_Exam.SubSet)
+  tmpExam_pp <- Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, ]$Perspiration
+  tmpBL_pp.mean <- Df_BL.mean[Df_BL.mean$ParticipantID == p, ]$Perspiration
+
+  # HR.E4 Mean
+  tmpExam_HR.E4 <- Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, ]$HR.E4
+  tmpBL_HR.E4_Mean <- Df_BL.mean[Df_BL.mean$ParticipantID == p, ]$HR.E4
+
+  # HR.AW Mean
+  tmpExam_HR.AW <- Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, ]$HR.AW
+  tmpBL_HR.AW_Mean <- Df_BL.mean[Df_BL.mean$ParticipantID == p, ]$HR.AW
+  
+
+  Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, ]$PPNorm <- tmpExam_pp - tmpBL_pp.mean
+  Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, ]$HR.E4Norm <- tmpExam_HR.E4 - tmpBL_HR.E4_Mean
+  Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, ]$HR.AWNorm <- tmpExam_HR.AW - tmpBL_HR.AW_Mean
+}
+
+
+
+
+library(bestNormalize)
+
+
+# PPNorm Best Normalization( Correction)
+cat("-- PPNorm Best Normalization( Correction) \n")
+PP_bst_method<- bestNormalize(Df_Exam.SubSet$PPNorm , na.rm = T)
+print(PP_bst_method)
+Df_Exam.SubSet$PPNorm.Corrected <- PP_bst_method$x.t
+
+# HR.E4Norm Best Normalization( Correction)
+cat("-- HR.E4Norm Best Normalization( Correction) \n")
+HRE4_bst_method<- bestNormalize(Df_Exam.SubSet$HR.E4Norm , na.rm = T)
+print(HRE4_bst_method)
+Df_Exam.SubSet$HR.E4Norm.Corrected <- HRE4_bst_method$x.t
+
+# HR.AWNorm Best Normalization( Correction)
+cat("-- HR.AWNorm Best Normalization( Correction) \n")
+HRAW_bst_method<- bestNormalize(Df_Exam.SubSet$HR.AWNorm , na.rm = T)
+print(HRAW_bst_method)
+Df_Exam.SubSet$HR.AWNorm.Corrected <- HRAW_bst_method$x.t
+
+# HRVNorm Best Normalization( Correction)
+HRV_bst_method<- bestNormalize(Df_Exam.SubSet$HRV.IBINorm , na.rm = T)
+cat("-- HRVNorm Best Normalization( Correction) \n")
+print(HRV_bst_method)
+Df_Exam.SubSet$NHRV.Corrected <- HRV_bst_method$x.t
+
+```
+
+
+
+## QQ Plots before vs after Correction, Signal level
+
+```{r Correction_before_after, fig.height=9, fig.width=7}
+library(ggplot2)
+library(cowplot)
+library(latex2exp)  # for TeX()
+
+vars <- c(
+  "PPNorm",
+  "PPNorm.Corrected",
+  "HR.AWNorm",
+  "HR.AWNorm.Corrected",
+  "HR.E4Norm",
+  "HR.E4Norm.Corrected",
+  "HRV.IBINorm",
+  "NHRV.Corrected"
+)
+
+titles <- c(
+  "\\textit{$CFP$}",         # PPNorm
+  "\\textit{$FPN$}",         # PPNorm.Corrected
+  "\\textit{$CHR_{AW}$}",    # HR.AWNorm
+  "\\textit{$NHR_{AW}$}",    # HR.AWNorm.Corrected
+  "\\textit{$CHR_{E4}$}",    # HR.E4Norm
+  "\\textit{$NHR_{E4}$}",    # HR.E4Norm.Corrected
+  "\\textit{$CHRV$}",        # HRV.IBINorm
+  "\\textit{$NHRV$}"         # NHRV.Corrected
+)
+ncol <- 2
+nrow <- 4
+
+qq_plots <- lapply(seq_along(vars), function(i) {
+  var_i   <- vars[i]
+  title_i <- titles[i]
+  
+  # determine panel position
+  row_i <- ceiling(i / ncol)
+  col_i <- ifelse(i %% ncol == 1, 1, 2)
+  
+  
+  p <- ggplot(Df_Exam.SubSet, aes_string(sample = var_i)) +
+    geom_qq(color = "black", size = 0.8) +
+    ggplot2::stat_qq_line(color = "red", size = 0.8) +
+    my_theme1 +
+    ggtitle(TeX(title_i)) +
+    labs(
+      x = "Theoretical Quantiles",
+      y = "Sample Quantiles"
+    )
+  
+  n <- sum(!is.na(Df_Exam.SubSet[[var_i]]))
+  p <- p + annotate("text", x = 0, y = Inf, hjust = 0.5, vjust = 1.5,  parse = TRUE, size = 5,
+                   label = paste0("~italic(n)", " == ", n)
+                   )
+  
+  # remove y–axis title on right column
+  if (col_i > 1) {
+    p <- p + theme(axis.title.y = element_blank()
+                   ) 
+  }
+  
+  # remove x–axis title on all but bottom row
+  if (row_i < nrow) {
+    p <- p + theme(axis.title.x = element_blank()
+                   ) 
+    
+  }
+  
+  p
+})
+
+final <- cowplot::plot_grid(
+  plotlist = qq_plots,
+  ncol     = ncol,
+  nrow     = nrow,
+  align    = "hv"
+)
+
+print(final)
+
+
+if (is_save == TRUE) {
+  ggsave(
+  filename = file.path(plot_dir, "Figure5.png"), # Correction_QQplots.png
+  plot     = final,
+  width    = 7,
+  height   = 9,
+  dpi      = 300
+  )
+}
+```
+
+
+# Signal Level Summary Statistics
+```{r echo=FALSE}
+library(rstatix)
+
+# Summary Statistics
+summ_stat_Participant <- Df_Exam.SubSet %>%
+  group_by(Question.Type) %>%
+  get_summary_stats(
+    Time, Perspiration, HR.AW, HR.E4, HRV.IBI, 
+    show = c("mean", "sd", "median", "min", "max" ,"n")
+  )
+
+summ_stat_Participant
+
+```
+
+
+# Create Qlevel data frame
+```{r Qlevel-df, include=FALSE}
+# Create Qlevel data frame
+colnames(Df_Exam.SubSet)
+
+Qlevel <- Df_Exam.SubSet %>%
+  group_by(ParticipantID, Question.Name, Question.Type) %>%
+  summarise(
+    Gender = first(Gender),
+    Perspiration = mean(Perspiration, na.rm = T),
+    #PPlog = mean(pp_log, na.rm = T),
+    PPNorm = mean(PPNorm.Corrected, na.rm = T) , # Best Corrected
+    HR.AW = mean(HR.AW, na.rm = T),
+    HR.AWNorm = mean(HR.AWNorm.Corrected, na.rm = T), # Best Corrected
+    HR.E4 = mean(HR.E4, na.rm = T), # E4 Perfect
+    HR.E4Norm = mean(HR.E4Norm.Corrected, na.rm = T), # HR.E4Norm.Corrected Best Corrected
+    HRV.IBI = mean(HRV.IBI, na.rm = T),
+    HRVNorm = mean(NHRV.Corrected, na.rm = T), # Best Corrected
+    SAI = first(SAI.Score),
+    QType = first(Question.Type),
+    QOrder = first(Question.Order),
+    QNumber = first(Question.Number),
+    QTime = n(),
+    Grade = first(as.character(Attempt.Correctness)), #  Attempt.Correctness = Grade
+    SUS = first(SUS.Score)
+  ) 
+
+
+# str(Qlevel)
+
+
+Qlevel$Gender <- as.character(Qlevel$Gender)
+# Relevel the factors
+#Qlevel$Gender < factor(Qlevel$Gender, levels = c("F", "M"))
+Qlevel$Gender <- relevel(factor(Qlevel$Gender), ref = "M")
+Qlevel$Grade <- relevel(factor(Qlevel$Grade), ref = "0")
+levels(Qlevel$Gender)
+levels(Qlevel$Grade)
+# [1] "M" "F"
+
+Qlevel$Question.Type <- factor(Qlevel$Question.Type, levels = c("V", "A", "W"))
+
+print("Number of participants in Qlevel data frame")
+colSums(!is.na(Qlevel))
+
+
+```
+
+
+
+
+```{r include=FALSE}
+#Create table that shows missing Question.Name per ParticipantID and per 
+
+all_QNames = unique(Df_Exam.SubSet$Question.Name)
+
+all_PIDs = unique(Df_Exam.SubSet$ParticipantID)
+
+# Create a data frame to store the results
+missing_QNames <- data.frame(ParticipantID = character(), Missing_QName = character(), stringsAsFactors = FALSE)
+# Loop through each ParticipantID
+for (p in all_PIDs) {
+  # Get the Question.Name for the current ParticipantID
+  QNames <- unique(Df_Exam.SubSet[Df_Exam.SubSet$ParticipantID == p, "Question.Name"])
+  
+  # Find the missing Question.Name
+  missing_names <- setdiff(all_QNames, QNames)
+  
+  # Add the results to the data frame
+  if (length(missing_names) > 0) {
+    missing_QNames <- rbind(missing_QNames, data.frame(ParticipantID = p, Missing_QName = paste(missing_names, collapse = ", "), stringsAsFactors = FALSE))
+  }
+}
+
+
+missing_QNames
+
+```
+
+
+### Simple Stress Labeling: PP, HR.E4, HR.AW,  HRVNorm 
+
+*mean is used the threshold *
+```{r Test, echo=FALSE}
+library(dplyr)
+
+# 1) Compute all summary stats by ParticipantID in one go
+participant_stats <- Qlevel %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    across(
+      c(PPNorm, HR.E4Norm, HR.AWNorm, HRVNorm),
+      list(
+        mean   = ~mean(.x, na.rm = TRUE),
+        #sd     = ~sd(.x,   na.rm = TRUE),
+        #median = ~median(.x, na.rm = TRUE),
+        n      = ~sum(!is.na(.x))
+      ),
+      .names = "{.col}_{.fn}"
+    ),
+    .groups = "drop"
+  )
+
+
+# 2) Join stats back, label stress, drop any missing physiology, and set factor levels
+Qlevel_Simpl_Stress <- Qlevel %>%
+  left_join(participant_stats, by = "ParticipantID")  %>%
+  mutate(
+    Stress.pp   = factor(if_else(PPNorm    > PPNorm_mean,    "S", "NS"), levels = c("NS","S")),
+    Stress.hre4 = factor(if_else(HR.E4Norm  > HR.E4Norm_mean,  "S", "NS"), levels = c("NS","S")),
+    Stress.hraw = factor(if_else(HR.AWNorm  > HR.AWNorm_mean,  "S", "NS"), levels = c("NS","S")),
+    Stress.nhrv = factor(if_else(HRVNorm    < HRVNorm_mean,    "S", "NS"), levels = c("NS","S")),
+
+    Gender      = factor(Gender, levels = c("F","M")),
+    QType       = factor(QType,  levels = c("V","A","W"))
+  )
+
+
+# Done: Qlevel_Simpl_Stress now has all your means, sds, medians, n, 
+#      plus four clean Stress.* factors and properly‐leveled Gender/QType.
+
+#colSums(!is.na(Qlevel_Simpl_Stress))
+
+names(Qlevel_Simpl_Stress)
+```
+
+
+```{r addMaxEmotion, echo=FALSE}
+# Add max emotion to the Second level data
+
+colNamesFACS <- c("F_Angry", "F_Disgusted", "F_Afraid", "F_Happy", "F_Sad", "F_Surprised", "F_Neutral")
+
+Df_Exam.FACS <- Df_Exam.SubSet %>%
+  dplyr::select(ParticipantID, Question.Name, Question.Type, colNamesFACS) #%>%
+  # rename(
+  #   QName = Question.Name,
+  #   QType = Question.Type
+  # )
+
+names(Df_Exam.FACS)
+
+Df_Exam.FACS_maxF <- Df_Exam.FACS %>%
+  dplyr::select(colNamesFACS) %>%
+  mutate(F_MaxEmotion = names(.)[max.col(.)]) %>%
+  mutate(Df_Exam.FACS[, c(1:3)])
+
+Df_Exam.FACS <- Df_Exam.FACS_maxF[, c(9:11, 1:8)]
+
+Df_Exam.SubSet$F_MaxEmotion <- as.factor(Df_Exam.FACS$F_MaxEmotion)
+
+# Remove NAs
+Df_Exam.FACS <- na.omit(Df_Exam.FACS)
+
+```
+
+
+
+# Create FACS Qlevel data by aggregating the emotions
+
+\newpage
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+FACS.Qlevel <- Df_Exam.FACS %>%
+   group_by(ParticipantID, Question.Name, Question.Type) %>%
+   summarise(
+     Angry = mean(F_Angry, na.rm = T), # 17
+     Disgusted = mean(F_Disgusted, na.rm = T),
+     Afraid = mean(F_Afraid, na.rm = T),
+     Happy = mean(F_Happy, na.rm = T), # main 1 , [20]
+     Sad = mean(F_Sad, na.rm = T), # main 2 [21]
+     Surprised = mean(F_Surprised, na.rm = T),
+     Neutral = mean(F_Neutral, na.rm = T)
+ )
+
+
+FACS.Qlevel$Question.Type <- factor(FACS.Qlevel$Question.Type, levels = c("V", "A", "W"))
+
+#colSums(is.na(FACS.Qlevel))
+
+print("Number of participants in Qlevel FACS data frame")
+table(FACS.Qlevel$ParticipantID)
+
+# if (is_save == TRUE) {
+#    # Save DF as csv file
+#    f_path <- sprintf("%sAffectiveMath_Qlevel_FACS_N%s.csv", data_dir, N)
+#    write_csv(FACS.Qlevel, f_path)
+# }
+
+ #browseURL(f_path)
+
+```
+
+
+
+
+```{r}
+Qlevel_Stress_FACS <- Qlevel_Simpl_Stress %>%
+  left_join(FACS.Qlevel, by = c("ParticipantID", "Question.Name","Question.Type"))
+names(Qlevel_Stress_FACS)
+
+write.csv(Qlevel_Stress_FACS, file = sprintf("%sTAFFC_Qlevel_Data_N%s.csv", data_dir, N), row.names = FALSE)
+```
+
+
+# Exploratory plots for Responses and Predictors
+
+## EDA Plots 1
+
+```{r EDA1, include=FALSE}
+mytheme1bold.italic <- my_theme1 + theme(
+  axis.text.x = element_text(face = "bold.italic"),
+  text = element_text(size = 14, face = "bold"),
+  axis.text.y = element_blank(), # Hides tick values on the left y-axis
+  axis.ticks.y = element_blank(), # Hides tick marks on the left y-axis
+  axis.text.y.right = element_blank(), # Hides tick values on the right y-axis
+  axis.ticks.y.right = element_blank()
+)
+
+
+my_theme_bold.italic <- my_theme + theme(
+  text = element_text(size = 14, face = "bold")
+)
+
+PP.len <- colSums(!is.na(Qlevel))[["PPNorm"]]
+HRE4.len <- colSums(!is.na(Qlevel))[["HR.E4Norm"]]
+HRAW.len <- colSums(!is.na(Qlevel))[["HR.AWNorm"]]
+HRV.len <- colSums(!is.na(Qlevel))[["HRVNorm"]]
+
+
+# All variables are scaled. 
+PP_unit <- "scaled"
+HR_unit = "scaled" 
+HRV_unit = "scaled"
+
+# build the full y‐label string
+pp_y_lab <- sprintf("$\\bar{ \\textit{NFP}}$ \\[%s\\]", PP_unit)
+hre4_y_lab = sprintf("$\\bar{ \\textit{NHR}}_{E4 }$ [%s]", HR_unit)
+hraw_y_lab = sprintf("$\\bar{ \\textit{NHR}}_{AW }$ [%s]", HR_unit)
+hrv_y_lab = sprintf("$\\bar{ \\textit{NHRV}}$ [%s]", HRV_unit)
+
+
+
+
+pId.len <- length(unique(Qlevel$ParticipantID))
+
+pp.lim <- range(Qlevel$PPNorm, na.rm = T)
+
+## PPNorm normalized and corrected ####
+pp.plot <- ggplot(Qlevel, aes(y = PPNorm)) +
+  geom_boxplot(fill = "gray") +
+  labs(x = "",
+       y = TeX(pp_y_lab)
+       ) +
+  my_theme_bold.italic +
+  annotate("text",
+    x = 0, y = 1.25, angle = 90,
+    label = paste0("~italic(n)", " == ", PP.len),
+    vjust = -0.5, hjust = 0.25,
+    parse = TRUE, size = 5, color = "black"
+  )
+
+#pp.plot
+
+pp.qt <- ggplot(Qlevel, aes(x = Question.Type, y = PPNorm, fill = Question.Type)) +
+  geom_boxplot() +
+  mytheme1bold.italic +
+  labs(x = "", y = "" ) +
+  scale_y_continuous(limits = pp.lim, guide = "none") +
+  scale_y_continuous(
+    sec.axis = sec_axis(
+      ~., # Keeps the scale identical to the primary y-axis
+      name = "Facial Electrodermal Activty", # Right y-axis label
+      labels = NULL # Removes tick labels from the right y-axis
+    )
+  ) +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = TRUE, size = 5, vjust = -0.75, hjust = 1.5, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# pp.qt
+
+
+## HR E4 normalized and corrected ####
+e4.lim <- range(Qlevel$HR.E4Norm, na.rm = T)
+hre4.plot <- ggplot(Qlevel, aes(y = HR.E4Norm)) +
+  geom_boxplot(fill = "gray") +
+  # ggtitle(bquote("Heart Rate")) +
+  labs(x = "", 
+       y = TeX(hre4_y_lab)
+       ) +
+  my_theme_bold.italic +
+  annotate("text",
+    x = 0, y = 1.25, angle = 90,
+    label = paste0("~italic(n)", " == ", HRE4.len),
+    vjust = -0.5, hjust = 0.25,
+    parse = TRUE, size = 5, color = "black"
+  )
+
+# hre4.plot
+
+##  HRE4 Question Type 
+hre4.qt <- ggplot(Qlevel, aes(x = Question.Type, y = HR.E4Norm, fill = Question.Type)) +
+  geom_boxplot() +
+  mytheme1bold.italic +
+  labs( x = "",y = ""   ) +
+  scale_y_continuous(limits = e4.lim, guide = "none") +
+  scale_y_continuous(
+    sec.axis = sec_axis(
+      ~., # Keeps the scale identical to the primary y-axis
+      name = "E4 Heart Rate", # Right y-axis label
+      labels = NULL # Removes tick labels from the right y-axis
+    )
+  ) +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.5, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# hre4.qt
+
+## HR AW normalized and corrected ####
+aw.lim <- range(Qlevel$HR.AWNorm, na.rm = T)
+hraw.plot <- ggplot(Qlevel, aes(y = HR.AWNorm)) +
+  geom_boxplot(fill = "gray") +
+  # ggtitle(bquote("Heart Rate")) +
+  labs(x = "", 
+       y = TeX(hraw_y_lab)
+       ) +
+  my_theme_bold.italic +
+  annotate("text",
+    x = 0, y = 1.25, angle = 90,
+    label = paste0("~italic(n)", " == ", HRAW.len),
+    vjust = -0.5, hjust = 0.25,
+    parse = TRUE, size = 5, color = "black"
+  )
+
+# hraw.plot
+
+##  HRAW Question Type -->
+hraw.qt <- ggplot(Qlevel, aes(x = Question.Type, y = HR.AWNorm, fill = Question.Type)) +
+  geom_boxplot() +
+  mytheme1bold.italic +
+  labs( x = "",y = ""   ) +
+  scale_y_continuous(limits = aw.lim, guide = "none") +
+  scale_y_continuous(
+    sec.axis = sec_axis(
+      ~., # Keeps the scale identical to the primary y-axis
+      name = "AW Heart Rate", # Right y-axis label
+      labels = NULL # Removes tick labels from the right y-axis
+    )
+  ) +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.5, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# hraw.qt
+
+
+
+
+## HRV normalized and corrected ####
+hrv.lim <- range(Qlevel$HRVNorm, na.rm = T)
+hrv.plot <- ggplot(Qlevel, aes(y = HRVNorm)) +
+  geom_boxplot(fill = "gray") +
+  # ggtitle(bquote("Heart Rate Variability")) +
+  labs(x = "", 
+       y = TeX(hrv_y_lab)
+       ) +
+  my_theme_bold.italic +
+  annotate("text",
+    x = 0, y = .25, angle = 90,
+    label = paste0("~italic(n)", " == ", HRV.len),
+    vjust = -0.5, hjust = 1.5,
+    parse = TRUE, size = 5, color = "black"
+  )
+
+
+# hrv.plot
+
+##  HRV Question Type -->
+hrv.qt <- ggplot(Qlevel, aes(x = Question.Type, y = HRVNorm, fill = Question.Type)) +
+  geom_boxplot() +
+  mytheme1bold.italic +
+  labs( x = "", y = "" ) +
+  #scale_y_continuous(limits = hrv.lim, guide = "none") +
+  scale_y_continuous(limits = hrv.lim, guide = "none",
+    sec.axis = sec_axis(
+      ~., # Keeps the scale identical to the primary y-axis
+      name = "Heart Rate Variability", # Right y-axis label
+      labels = NULL # Removes tick labels from the right y-axis
+    )
+  ) +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.25, hjust = 1.5, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# hrv.qt
+```
+
+```{r EDA1_save, echo=FALSE, fig.height=13, fig.width=8}
+response.EDA <- cowplot::plot_grid(
+  pp.plot, pp.qt, 
+  hre4.plot, hre4.qt,
+  hraw.plot ,hraw.qt,
+  hrv.plot, hrv.qt,
+  # labels = c("A", "B", "C", "D", "E", "F"),
+  align = "h",
+  ncol = 2
+)
+
+final <- ggarrange(response.EDA, ncol = 1)
+final
+
+# if (is_save == TRUE) {
+#   path_name <- sprintf("%sEDA1_Plots_N%s.pdf", plot_dir, N)
+#   ggsave(path_name, final, width = 8, height = 13)
+# }
+```
+
+## EDA Plots 2
+
+```{r EDA2, include=FALSE}
+mytheme1bold.italic <- my_theme1 + theme(
+  axis.text.x = element_text(face = "bold.italic"),
+  text = element_text(size = 18, face = "bold")
+)
+
+set.seed(123)  # for reproducibility
+
+level3 <- Qlevel %>%
+  # 1) Turn Grade factor into numeric 0/1
+  mutate(
+    Grade_num = as.numeric(as.character(Grade)),
+    correct   = as.integer(Grade_num == 1)
+  ) %>%
+  
+  # 2) Group by Question.Type and summarise
+  group_by(Question.Type) %>%
+  summarise(
+    n = n(),
+    Correct.Percent = mean(correct) * 100,
+    
+    boot_samples = list(
+      replicate(
+        1e3,
+        mean(sample(correct, size = n(), replace = TRUE))
+      )
+    )
+  ) %>%
+  ungroup() %>%
+  
+  # 3) finish off your CI columns
+  mutate(
+    lower           = map_dbl(boot_samples, ~ quantile(.x, 0.025) * 100) %>% round(2),
+    upper           = map_dbl(boot_samples, ~ quantile(.x, 0.975) * 100) %>% round(2),
+    Correct.Percent = round(Correct.Percent, 2),
+    fifty = map_dbl(boot_samples, ~ quantile(.x, 0.05) * 100) %>% round(2)
+  )
+
+level3
+
+
+
+## Performance Grade ####
+performance_grade <- ggplot(level3, aes(x = Question.Type, y = Correct.Percent, fill = Question.Type)) +
+  geom_col() +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
+  geom_text(aes(label = Correct.Percent),  vjust = 3.5, hjust = 0.5, parse = TRUE,
+    position = position_dodge(width = 1), color = "black", size = 5) +
+  # annotate n above the bars
+  geom_text(aes(y = upper + 5, label = paste0(paste0("~italic(n)", " == ", n))), parse = TRUE,
+            size = 5) +
+  #scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+ scale_y_continuous(
+  expand = expansion(mult = c(0, 0.15)),
+  labels = function(x) paste0(x, "%")
+)+
+  labs(x = NULL, y = NULL, title = TeX("\\textit{QGRADE[1]}")) +
+  mytheme1bold.italic +
+  theme(legend.position = "none")
+
+print(performance_grade)
+
+## Question Solving Time ####
+
+time.plot <- Qlevel %>%
+  group_by(Question.Type) %>%
+  mutate(n = n()) %>%
+  ggplot(aes(Question.Type, QTime, fill = Question.Type)) +
+  geom_boxplot() +
+  geom_text(aes(y = 605, label = paste0(paste0("~italic(n)", " == ", n))),
+            size = 5,parse = TRUE) +      # <— here
+  mytheme1bold.italic +
+  labs(x = NULL, y = NULL, title = TeX("\\textit{QTIME} [s]"))
+
+
+
+
+# time.plot
+## SAI Score ####
+
+pId.len <- length(unique(Qlevel$ParticipantID))
+
+Subject_level <- Qlevel %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    Gender = first(Gender),
+    SAI = first(SAI)
+  )
+
+
+pId.len <- Subject_level %>% 
+  pull(ParticipantID) %>% 
+  unique() %>% 
+  length()
+
+
+sai.plot_violin <- Subject_level %>%
+  group_by(ParticipantID) %>%
+  summarise(SAI = first(SAI), .groups = "drop") %>%
+  ggplot(aes(x = factor(1), y = SAI)) +
+  geom_violin(fill = "gray", trim = TRUE) +
+  my_theme_bold.italic +
+  labs(x = NULL, y = NULL, title =  TeX("\\textit{$SAI$}")) +
+  annotate(
+    "text",
+    x = 1.25, y = 55,                # place your n‐label at y = 55
+    label = paste0("~italic(n) == ", pId.len),
+    parse = TRUE,
+    size = 5, vjust = -1, hjust = 0.5
+  )
+
+# print it
+#sai.plot_violin
+
+
+```
+
+```{r EDA2_Plot, echo=FALSE, fig.height=4, fig.width=9}
+panel.EDA <- cowplot::plot_grid(
+  time.plot,
+  performance_grade,
+  #sai.plot,
+  sai.plot_violin,
+  #gender.plot,
+  #labels = c("a", "b", "c", "d"),
+  labels = c("a", "b", "c"),
+  label_size = 20,  
+  align = "h",
+  nrow = 1
+)
+
+
+final <- ggarrange(panel.EDA, ncol = 1)
+final
+
+if (is_save == TRUE) {
+  path_name <- sprintf("%sFigure9.pdf", plot_dir) 
+  ggsave(path_name, final, width = 9, height = 4)
+}
+
+```
+
+# Time, Grade Stats per Question Type
+```{r}
+
+ Qlevel %>%
+  group_by(Question.Type) %>%
+   summarise(
+    n = n(),
+    mean = mean(QTime, na.rm = T),
+    sd = sd(QTime, na.rm = T),
+    median = median(QTime, na.rm = T),
+    min = min(QTime, na.rm = T),
+    max = max(QTime, na.rm = T)
+  )
+
+print("Grade Stats per Question Type")
+level3
+
+print("SAI Stats per Question Type")
+
+Qlevel %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    SAI = first(SAI)
+  ) %>%
+  summarise(
+    n = n(),
+    mean = mean(SAI, na.rm = T),
+    sd = sd(SAI, na.rm = T),
+    median = median(SAI, na.rm = T),
+    min = min(SAI, na.rm = T),
+    max = max(SAI, na.rm = T)
+  )
+
+```
+
+# SUS
+
+```{r echo=FALSE, fig.height=5, fig.width=7}
+
+
+Df_sus <- Qlevel %>%
+  dplyr::select(ParticipantID, Question.Name, Question.Type, SUS) %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    SUS = first(SUS)
+  )
+
+n.lenght = length(Df_sus$SUS)
+
+
+SUS.boxplot <- Df_sus %>%
+  mutate(
+    mean = mean(SUS),
+    std = round(sd(SUS), 2)
+  ) %>%
+  ggplot(aes(y = SUS)) + # Draw ggplot2 boxplot without colors
+  geom_boxplot() +
+  labs(title = "SUS ", x = "", y = "") +
+  # 3. horizontal line at the SUS cutoff of 68
+  geom_hline(
+    yintercept = 68,
+    linetype   = "dashed",
+    color      = "red"
+  ) +
+  my_theme +
+  theme(
+    text             = element_text(size = 18, face = "bold"),   # base text
+    axis.title.y     = element_text(size = 24, face = "bold"),   # larger y-axis title
+    axis.text.y      = element_text(size = 16)                   # larger y-axis tick labels
+  )+
+  annotate("text",
+    x = 0, y = 81, angle = 0,
+    label = paste0("~italic(n)", " == ", n.lenght),
+    vjust = -0.5, hjust = .5,
+    parse = TRUE, size = 6, color = "black"
+  )
+
+SUS.boxplot
+
+if (is_save == TRUE) {
+  f_path = sprintf("%sFigure2b.pdf", plot_dir) #SUS-Boxplot.pdf
+  ggsave(f_path, width = 11, height = 7)
+}
+
+
+# Compute mean and SD
+mean_overall <- mean(Df_sus$SUS, na.rm = TRUE)
+sd_overall   <- sd( Df_sus$SUS, na.rm = TRUE)
+
+
+ggqqplot(Df_sus$SUS,
+  ylab = "SUS Score",
+  ggtheme = theme_minimal()
+)
+
+# Print as “Mean ± SD”
+cat(sprintf("SUS Mean \u00B1 SD: [%.2f \u00B1 %.2f]\n", 
+            mean_overall, sd_overall))
+```
+
+# S006
+
+```{r S006, echo=FALSE, fig.height=5, fig.width=10}
+
+pids <- "S006"
+
+Df_Exam_offline_p_cut <- Df_Exam.SubSet %>%
+      dplyr::filter(ParticipantID == pids) %>%
+      group_by(ParticipantID,Question.Name) %>%
+      mutate(Time2 = Time) %>% # keep time as numeric to use in the plot
+      summarise(
+        Gender = first(Gender),
+        Perspiration = mean(Perspiration, na.rm = T),
+        PP_Offline = NA,#mean(Perspiration_offline, na.rm = T),
+        HR.E4 = mean(HR.E4, na.rm = T),
+        HR.AW = mean(HR.AW, na.rm = T),
+        QName = first(Question.Name),
+        QNumber = first(Question.Number),
+        QType = first(Question.Type),
+        EVersion = first(ExamVersion),
+        Grade = first(Attempt.Correctness), #  Attempt.Correctness = grade
+        Time_mean = mean(Time, na.rm = T)
+      ) %>% arrange(.,QNumber)
+    
+Df_Exam_offline_p_cut$QType <- factor(Df_Exam_offline_p_cut$QType, levels = c("W", "V", "A"))
+
+
+QType_colors <- c("V" = "red", "A" = "green", "W" = "blue")
+
+
+
+PP_unit <- "°C$^2$" # 
+HR_unit = "bpm" # both HR E4 and AW are in BPM
+# HRV_unit = "s"
+
+
+# expression(paste(italic(FP) * " [", degree, " C"^2, "]"))
+pp_title =   sprintf("$\\textit{FP}$ \\[%s\\]", PP_unit)
+hr_title =  sprintf("\\textit{$HR_{AW}$} & \\textit{$HR_{E4}$ }\\[%s\\]", HR_unit)
+#hrv_title =  sprintf("$\\bar{\\Delta \\textit{HRV}}$ [%s]", HRV_unit)
+
+
+pp_plot <-   Df_Exam_offline_p_cut %>%
+  filter(ParticipantID %in% pids) %>%
+  group_by(ParticipantID) %>%
+  mutate(Time = 1:n()) %>%
+  ggplot(aes(x = Time, y = Perspiration, group = ParticipantID)) +
+  geom_line() +
+  my_theme1 +
+  theme(strip.background = element_blank(), strip.placement = "outside") +
+  stat_correlation(mapping = use_label(c("n")), label.x = "right", size = 6) +
+  labs(title = TeX(pp_title), x = TeX("\\textit{$QNUMBER$}"), y = "") +
+geom_hline(
+  data      = filter(Df_BL.mean, ParticipantID %in% pids),
+  aes(
+    yintercept = Perspiration,
+    linetype   = "BL"            # map the aesthetic to "BL" instead of "dashed"
+  ),
+  color     = "blue",
+  show.legend = TRUE
+) +
+scale_linetype_manual(
+  name   = "",                  # optional: set your legend title here
+  values = c(BL = "dashed"),    # map "BL" to the dashed linetype
+  labels = c(BL = "FP_BL")         # label the legend key as "BL"
+) +
+geom_rect(
+  aes(
+    xmin = Time,
+    xmax = Time + 1,
+    ymin = -Inf, ymax = 0.0057,
+    fill = QType
+  ),
+  alpha = 0.3,
+  inherit.aes = FALSE,
+  show.legend = TRUE
+) +
+scale_fill_manual(
+  breaks = c("W", "V", "A"),
+  labels = c("WORD", "VIEO", "ABSTRACT" ),
+  values = scales::alpha(QType_colors, 0.3)
+ )
+
+
+hr_plot <- Df_Exam_offline_p_cut %>%
+  filter(ParticipantID %in% pids) %>%
+  group_by(ParticipantID) %>%
+    mutate(Time = 1:n()) %>%
+      mutate(
+        n_hr.aw = sum(!is.na(HR.AW)),
+        n_hr.e4 = sum(!is.na(HR.E4))
+      ) %>%
+  ggplot(aes(x = Time, y = HR.E4)) +
+  geom_line(aes(fill = "black")) +
+  geom_rect(aes(
+    xmin = Time,
+    xmax = Time+1 ,
+    ymin = -Inf, ymax = 67,
+    fill = QType
+  ),   alpha = 0.3,
+  inherit.aes = FALSE,
+  show.legend = TRUE) +    
+  scale_fill_manual(values = alpha(QType_colors, 0.3))+
+  geom_point(aes(x = Time, y = HR.AW), size = 1, alpha = 0.2, color = "red") +
+  geom_text(aes( label = sprintf("italic(n)[AW] == %d", n_hr.aw), color = "red",
+                  x = 18 , y = 74 ), parse = TRUE, size = 6, hjust = 1, vjust = 0) +
+  geom_text(aes(label = sprintf("italic(n)[E4] == %d", n_hr.e4),
+                x = 18+ 3, y = 74), parse = TRUE, size = 6, hjust = 0, vjust = 0) +
+  my_theme1 +
+  labs(x = TeX("\\textit{$QNUMBER$}"), y = "") +
+  geom_hline(
+    data = filter(Df_BL.mean, ParticipantID %in% pids),
+    aes(yintercept = HR.E4, linetype = "BL_E4"), color = "blue"
+  ) +
+  geom_hline(
+    data = filter(Df_BL.mean, ParticipantID %in% pids),
+    aes(yintercept = HR.AW, linetype = "BL_AW"), color = "orange"
+  ) + ggtitle(TeX(hr_title))
+
+
+
+#s006_raw = ggpubr::ggarrange(pp_plot, hr_plot, ncol = 2, nrow = 1, align = "h") 
+s006_raw <- ggpubr::ggarrange(
+  pp_plot, hr_plot,
+  ncol       = 2, 
+  nrow       = 1, 
+  align      = "h",
+  labels     = c("a", "b"),               # your panel labels
+  label.x    = c(0.05, 0.05),             # x‐position of each label
+  label.y    = c(0.99, 0.99),             # y‐position of each label
+  font.label = list(size = 20, face = "bold")
+)
+
+#print(s006_raw)
+
+
+# rebuild the QType legend at the bottom
+legend_QType <- get_legend(
+  ggplot(data.frame(Question.Type = factor(c("W","V","A"), levels = c("W","V","A"))),
+         aes(x = Question.Type, fill = Question.Type)) +
+    geom_bar(alpha = 0.3) +
+    scale_fill_manual(
+      values = scales::alpha(QType_colors, 0.3),
+      labels = c("WORD", "VIDEO", "ABSTRACT"),
+      guide  = guide_legend(title = NULL, override.aes = list(alpha = 0.3))
+    ) +
+    theme_void() +
+    theme(legend.position = "bottom")
+)
+
+# stack the main plot above and the legend below
+final_plot <- cowplot::plot_grid(
+  s006_raw,
+  align = "h",
+  legend_QType,
+  ncol        = 1,
+  rel_heights = c(1, 0.1)
+)
+
+print(final_plot)
+
+if (is_save == TRUE) {
+  path_name <- sprintf("%sFigure6.pdf", plot_dir) # S006_Plots.pdf
+  ggsave(path_name, final_plot, width = 10, height = 5)
+}
+
+
+```
+
+
+## Collinearity Check for all predictors
+
+```{r Multi-Regr-Collinearity-Plot, fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
+library(ggcorrplot)
+library(ggtext)
+library(psych)
+
+reduced_data <- subset(Qlevel, select = c(SAI, QTime, Question.Type, Gender, Grade))
+
+reduced_data <- reduced_data %>%
+  # rename your time variable
+  rename(QTIME = QTime,
+         QTYPE = Question.Type,
+         SEX = Gender
+         )
+
+corr_matrix <- model.matrix(~., data=reduced_data)
+correlation_plot <- cor((corr_matrix), use="everything") 
+
+colnames(correlation_plot) = rownames(correlation_plot) <- c("Intercept","*SAI*", "*QTIME*","*QTYPE* &nbsp; [*A*]", "*QTYPE* &nbsp; [*W*]",  "*SEX* &nbsp; [*F*]","*QGRADE* &nbsp; [1]" )
+
+corr.plot <- (ggcorrplot(correlation_plot, show.diag=FALSE, type="lower", lab=TRUE) + 
+                theme(axis.text = element_markdown()))
+
+corr.plot
+
+
+library(data.table) 
+  
+set.seed(1) 
+  
+# counting frequencies of factor 
+# levels 
+setDT(reduced_data)[, .N, keyby=QTYPE] 
+
+detach("package:psych", unload=TRUE)
+
+if (is_save == TRUE) {
+  plot_path <- sprintf("%sFigure8.pdf", plot_dir) # Collinearity_Plot.pdf
+  ggsave(plot_path, corr.plot, width = 7, height = 6)
+}
+
+
+
+```
+
+
+
+
+
+
+### Qlevel use of mean values
+
+```{r fig.height= 4.5, fig.width=7}
+# Boxplot of FACS Qlevel by Question Type
+
+long_data <- FACS.Qlevel %>%
+  pivot_longer(cols = Angry:Neutral, names_to = "Emotion", values_to = "Probability") %>%
+  arrange(ParticipantID, Question.Type)
+
+long_data$Emotion <- factor(long_data$Emotion)
+
+
+long_data$Question.Type <- factor(long_data$Question.Type, levels = c("A", "V", "W"))
+
+emotion_labels <- c("Afraid", "Angry", "Disgusted", "Happy", "Neutral", "Sad", "Surprised")
+
+long_data %>%
+  mutate(n = n()) %>%
+  ggplot(aes(x = Emotion, y = Probability * 100, fill = Emotion)) +
+  geom_boxplot() +
+  scale_fill_manual(
+    values = c(
+      "Angry" = "red",
+      "Afraid" = "orange",
+      "Disgusted" = "green",
+      "Happy" = "yellow",
+      "Neutral" = "grey",
+      "Sad" = "blue",
+      "Surprised" = "purple"
+    ),
+    name = "",
+    labels = emotion_labels,
+    guide = guide_legend(nrow = 1) # Put legend labels in one row
+  ) +
+  scale_x_discrete(labels = emotion_labels) +
+  scale_y_continuous(labels = scales::label_number(), limits = c(0, 100)) +
+  labs(
+    title = TeX(paste0("Question Level | $\\textit{n}$ = ", N)),
+    y = "Observations [%]", x = ""
+  ) +
+  my_theme1 +
+  theme(legend.position = "none") # +
+  # geom_text(aes(label = paste0("~italic(n)", " == ", n), y = 75),
+  #   size = 4, vjust = -1, hjust = 0.75, parse = TRUE, angle = 90,
+  #   position = position_dodge(width = 1)
+  # )
+```
+
+### Qlevel - Proportion of Expressed Emotions by Participant and Task
+
+```{r FACS_Qlevel_data, echo=FALSE, fig.height=7, fig.width=11}
+long_data <- FACS.Qlevel %>%
+  pivot_longer(cols = Angry:Neutral, names_to = "Emotion", values_to = "Probability") %>%
+  arrange(ParticipantID, Question.Type)
+
+long_data$Emotion <- factor(long_data$Emotion, levels = c("Angry", "Disgusted", "Afraid", "Happy", "Sad", "Surprised", "Neutral"))
+
+long_data <- long_data %>%
+  mutate(
+    ID_and_Task = interaction(ParticipantID, Question.Type, sep = "_"),
+    ParticipantID = factor(ParticipantID)
+  ) # Ensure ParticipantID is a factor to maintain order
+
+strip_labels <- c(
+  "V" = "VIDEO",
+  "A" = "ABSTRACT",
+  "W" = "WORD"
+)
+
+
+
+
+rm(FACS_Qlevel_stack)
+FACS_Qlevel_stack <- long_data %>%
+  ggplot(aes(x = ParticipantID, y = Probability, fill = Emotion)) +
+  geom_bar(stat = "identity", position = "fill") +
+  facet_wrap(~Question.Type ~ .,
+    scales = "free_y", nrow = 3,
+    strip.position = "right",
+    labeller = as_labeller(strip_labels)
+  ) + 
+  scale_fill_manual(
+    values = c(
+      "Angry" = "red",
+      "Disgusted" = "green",
+      "Afraid" = "orange",
+      "Happy" = "yellow",
+      "Sad" = "blue",
+      "Surprised" = "purple",
+      "Neutral" = "grey"
+    ),
+    name = "",
+    labels = c("ANGRY", "DISGUSTED", "AFRAID", "HAPPY", "SAD", "SURPRISED", "NEUTRAL"),
+    guide = guide_legend(nrow = 1) # Put legend labels in one row
+  ) +
+  labs(title = "", y = "", x = "") +
+  my_theme1 +
+  theme(
+    #axis.text.x.bottom = element_text(angle = 60, hjust = 0.5),
+    axis.text.x.bottom = element_text(angle = 75, hjust = 1),
+    strip.background = element_rect(fill = "white", color = "black"), # Add border to facet labels
+    # strip.text.x = element_text(size = 10, face = "bold"),,
+    legend.text = element_text(size = 13),
+    legend.position = "top"
+  ) +  scale_x_discrete(guide = guide_axis(n.dodge = 2)) 
+
+
+```
+
+# Figure 10a - Valence_Qlevel_stack
+
+```{r FACS_Qlevel_stack, echo=FALSE, fig.height=7, fig.width=11}
+FACS_Qlevel_stack
+
+# Save the plot
+if (is_save == TRUE) {
+  #f_path <- sprintf("%sFACS_Qlevel_stack-1.pdf", plot_dir, N)
+  f_path <- sprintf("%sFigure10a.pdf", plot_dir, N) #  FACS_Qlevel_stack-2
+  ggsave(f_path, width = 11, height = 7)
+}
+
+```
+
+
+```{r echo=FALSE, fig.height=10, fig.width=7}
+my_theme1 <- theme(
+  panel.grid = element_blank(),
+  plot.title = element_text(hjust = 0.5),
+  axis.text.x = element_text(size = 10, face = "bold.italic"),
+  axis.text.y = element_text(size = 10, face = "bold"),
+  strip.text = element_text(size = 14),
+  legend.position = "none"
+)
+
+# width: change box plots width
+fun_length <- function(x) {
+  return(data.frame(y = median(x), label = paste0("n=", length(x))))
+}
+
+
+FACS.Qtype.boxplot <- FACS.Qlevel %>%
+  ggplot(aes(x = Question.Type, y = Happy, fill = Question.Type)) +
+  geom_boxplot(position = position_dodge(width = 0.9)) +
+  ggtitle(bquote("Question Type")) +
+  my_theme1 +
+  labs(title = "Happy - Qlevel", x = "", y = "") +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.75, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+# FACS.Qtype.boxplot
+
+
+
+FACS.Qtype.LogHappy <- FACS.Qlevel %>%
+  ggplot(aes(x = Question.Type, y = log(Happy), fill = Question.Type)) +
+  geom_boxplot(position = position_dodge(width = 0.9)) +
+  ggtitle(bquote("Question Type")) +
+  my_theme1 +
+  labs(title = "Log Happy - Qlevel", x = "", y = "") +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = 1.25, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+# FACS.Qtype.LogHappy
+
+
+FACS.Qtype.Sad <- FACS.Qlevel %>%
+  ggplot(aes(x = Question.Type, y = Sad, fill = Question.Type)) +
+  geom_boxplot(position = position_dodge(width = 0.9)) +
+  ggtitle(bquote("Question Type")) +
+  my_theme1 +
+  labs(title = "Sad - Qlevel", x = "", y = "") +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.75, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# FACS.Qtype.Sad
+
+FACS.Qtype.Neutral <- FACS.Qlevel %>%
+  ggplot(aes(x = Question.Type, y = Neutral, fill = Question.Type)) +
+  geom_boxplot(position = position_dodge(width = 0.9)) +
+  ggtitle(bquote("Question Type")) +
+  my_theme1 +
+  labs(title = "Neutral - Qlevel", x = "", y = "") +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.75, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# FACS.Qtype.Neutral
+
+FACS.Qtype.LogNeutral <- FACS.Qlevel %>%
+  ggplot(aes(x = Question.Type, y = log(Neutral), fill = Question.Type)) +
+  geom_boxplot(position = position_dodge(width = 0.9)) +
+  ggtitle(bquote("Question Type")) +
+  my_theme1 +
+  labs(title = " Log Neutral - Qlevel", x = "", y = "") +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.75, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+# FACS.Qtype.LogNeutral
+
+FACS.Qtype.Afraid <- FACS.Qlevel %>%
+  ggplot(aes(x = Question.Type, y = Afraid, fill = Question.Type)) +
+  geom_boxplot(position = position_dodge(width = 0.9)) +
+  ggtitle(bquote("Question Type")) +
+  my_theme1 +
+  labs(title = "Afraid - Qlevel", x = "", y = "") +
+  stat_summary(
+    fun.data = n_fun, geom = "text", fun.y = median,
+    parse = T, size = 5, vjust = -0.75, hjust = -0.75, angle = 90,
+    position = position_dodge(width = 0.75)
+  )
+
+ggarrange(FACS.Qtype.boxplot, FACS.Qtype.LogHappy,
+  FACS.Qtype.Neutral, FACS.Qtype.Afraid,
+  FACS.Qtype.Sad,
+  #FACS.Qtype.Others,
+  ncol = 2, nrow = 3
+)
+```
+
+```{r echo=FALSE, fig.height=7, fig.width=7, message=FALSE, warning=FALSE}
+require(MASS)
+library("car")
+par(mfrow = c(2, 2))
+p1 <- with(FACS.Qlevel, qqp(Happy, "norm", main = "Happy"))
+p1 <- with(FACS.Qlevel, qqp(log(Happy), "norm", main = "Log Happy"))
+p1 <- with(FACS.Qlevel, qqp(Afraid, "norm", main = "Afraid"))
+p1 <- with(FACS.Qlevel, qqp(log(Afraid), "norm", main = "Log Afraid"))
+
+```
+

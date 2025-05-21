@@ -1,0 +1,911 @@
+---
+title: "Affective Math Multi linear Regression Mixed Effects"
+author: "Fettah Kiran"
+subtitle: "FP, HR E4, HR AW, HRV | N = 50"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_float: true
+    theme: united
+    number_sections: true 
+    mathjax: default
+  pdf_document: 
+    toc: true
+    number_sections: true 
+    keep_tex: true
+header-includes:
+  - \usepackage[table]{xcolor}
+  - \definecolor{myGray}{gray}{0.8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+------------------------------------------------------------------------
+
+*Notes:* 
+
+- Qlevel data is created by grouping the raw trial‑level data by participant, question type, and question name, and then computing the mean outcome within each group.
+- All inferential analyses were carried out with linear mixed‑effects models that include a participant‑centered random intercept to account for between‑subject variability.
+
+`Reference for Question Type: "V"`
+
+------------------------------------------------------------------------
+
+```{r include=FALSE}
+rm(list = ls())
+dir <- dirname(rstudioapi::getSourceEditorContext()$path)
+setwd(dir)
+getwd()
+```
+
+\newpage
+
+```{r include=FALSE}
+# library(tidyverse)
+# library(lubridate)
+# library(ggplot2)
+# library(cowplot)
+# library(ggpubr)
+# library(readr)
+# library(gridExtra)
+# library(dplyr)
+# library(tidyr)
+# library(knitr)
+# library("car")
+# library(lme4)
+# library(lmerTest)
+# library(lattice)
+# library(sjPlot)
+# library(Matrix)
+# require(ggpmisc) # for stat_poly_eq
+# library(reshape2)
+# library(kableExtra)
+# library(psych) ## Collinearity Plot
+# library(jtools)
+# library(latex2exp) # parses and converts LaTeX math formulas to R's plotmath expressions
+# library(ggeffects)
+# library(scales) ## scales::label_number()
+
+source("requirements.R")
+
+```
+
+
+```{r SpecialThemes, message=FALSE, warning=FALSE}
+
+
+# Load custom functions
+#browseURL("fm_plot_func.R")
+source("fm_plot_func.R")
+
+# options(digits=3)
+theme_set(theme_classic()) # set the theme to classic
+theme_update(plot.title = element_text(hjust = 0.5)) # center the title
+
+my_theme_bold.italic <- my_theme + theme(text = element_text(size = 14, face = "bold"))
+
+data_dir = "../data/processed/" # data directory
+plot_dir = "../figures/" # plot directory
+
+is_save <- TRUE
+```
+
+\newpage
+# Read Qeustion Level Data
+```{r readRawData, include=FALSE}
+N <- 50
+
+file = sprintf("%sTAFFC_Qlevel_Data_N%s.csv", data_dir, N)
+
+Qlevel = read.csv(file, header = TRUE, sep = ",", stringsAsFactors = T)
+
+
+names(Qlevel)
+
+Qlevel$Question.Type <- factor(Qlevel$Question.Type, levels = c("V", "A", "W"))
+Qlevel$Gender <- relevel(factor(Qlevel$Gender), ref = "M")
+Qlevel$Grade <- relevel(factor(Qlevel$Grade), ref = "0")
+
+PP.len <- colSums(!is.na(Qlevel))[["PPNorm"]]
+HRE4.len <- colSums(!is.na(Qlevel))[["HR.E4Norm"]]
+HRAW.len <- colSums(!is.na(Qlevel))[["HR.AWNorm"]]
+HRV.len <- colSums(!is.na(Qlevel))[["HRVNorm"]]
+
+
+# All variables are scaled. 
+PP_unit <- "scaled"
+HR_unit = "scaled" 
+HRV_unit = "scaled"
+
+# build the full y‐label string
+pp_y_lab <- sprintf("$\\bar{ \\textit{NFP}}$ \\[%s\\]", PP_unit)
+hre4_y_lab = sprintf("$\\bar{ \\textit{NHR}}_{E4 }$ [%s]", HR_unit)
+hraw_y_lab = sprintf("$\\bar{ \\textit{NHR}}_{AW }$ [%s]", HR_unit)
+hrv_y_lab = sprintf("$\\bar{ \\textit{NHRV}}$ [%s]", HRV_unit)
+
+
+
+```
+
+
+## Collinearity Check for all predictors
+
+```{r Multi-Regr-Collinearity-Plot, fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
+library(ggcorrplot)
+library(ggtext)
+library(psych)
+
+reduced_data <- subset(Qlevel, select = c(SAI, QTime, Question.Type, Gender, Grade))
+
+reduced_data <- reduced_data %>%
+  # rename your time variable
+  rename(QTIME = QTime,
+         QTYPE = Question.Type,
+         SEX = Gender
+         )
+
+corr_matrix <- model.matrix(~., data=reduced_data)
+correlation_plot <- cor((corr_matrix), use="everything") 
+
+colnames(correlation_plot) = rownames(correlation_plot) <- c("Intercept","*SAI*", "*QTIME*","*QTYPE* &nbsp; [*A*]", "*QTYPE* &nbsp; [*W*]",  "*SEX* &nbsp; [*F*]","*QGRADE* &nbsp; [1]" )
+
+corr.plot <- (ggcorrplot(correlation_plot, show.diag=FALSE, type="lower", lab=TRUE) + 
+                theme(axis.text = element_markdown()))
+
+corr.plot
+
+
+library(data.table) 
+  
+set.seed(1) 
+  
+# counting frequencies of factor 
+# levels 
+setDT(reduced_data)[, .N, keyby=QTYPE] 
+
+detach("package:psych", unload=TRUE)
+
+if (is_save == TRUE) {
+  plot_path <- sprintf("%sFigure8.pdf", plot_dir) # Collinearity_Plot.pdf
+  ggsave(plot_path, corr.plot, width = 7, height = 6)
+}
+
+
+
+```
+
+\newpage
+
+# Model 1 - PPNorm with best correction
+
+```{r M1_full, echo=FALSE, message=FALSE, warning=FALSE}
+
+M1.pp.fit.fm <- lmer(scale(PPNorm) ~ (1 | ParticipantID) + scale(SAI) + Question.Type + scale(QTime) + Grade + Gender, data = Qlevel, REML = FALSE)
+
+# Summary statistics of the full model
+summary(M1.pp.fit.fm)
+summ(M1.pp.fit.fm, digits = 3)
+```
+
+\newpage
+
+## Both-Direction Elimination (BDE)
+
+```{r echo=FALSE}
+step_bd <- step(M1.pp.fit.fm, direction = "both")
+step_bd # Display elimination results
+
+FM = get_model(step_bd) # Display the final model
+```
+
+\newpage
+
+## PP Final Model
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+M1.pp.fit.FM <- lmer(scale(PPNorm) ~ (1 | ParticipantID) + Question.Type + Gender, data = Qlevel, REML = FALSE)
+
+summary(M1.pp.fit.FM, digits = 3)
+summ(M1.pp.fit.FM, digits = 3)
+
+```
+
+\newpage
+
+## Plot Final Model
+
+```{r fig.height=5, fig.width=6}
+
+ylims <- c(-0.7, 0.5)
+
+# Question Type Final Model
+pp.qt.pm.fm <- ggpredict(M1.pp.fit.FM,
+  terms = c("Question.Type")
+) %>%
+  mutate(group = as.factor(c("1", "2", "3"))) %>%
+  drop_na() %>% 
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  scale_y_continuous(
+      limits = c(-0.7, 0.5),
+      breaks = seq(-0.7, 0.5, by = 0.3),
+      labels = scales::label_number(accuracy = 0.1)   # <— no scientific notation
+    ) +
+  scale_color_manual(values = c("gray", "cyan", "red")) +
+  my_theme_pred +
+  labs(x = "", y = TeX(pp_y_lab))
+
+
+# pp.qt.pm.fm # will be used to compare 3 models
+
+pp.gender.pm.fm <- ggpredict(M1.pp.fit.FM,
+  terms = c("Gender")
+) %>%
+  mutate(group = as.factor(c("1", "2"))) %>%
+  drop_na() %>% # check # of levels you've
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  scale_y_continuous(limits = ylims, guide = "none") + # "none" removes the y-axis ticks and labels
+  scale_color_manual(values = c("gray", "cyan")) +
+  my_theme_pred + 
+  
+  labs(x = "", y = "")
+
+# pp.gender.pm.fm 
+
+
+final.w.legend <- cowplot::plot_grid(pp.qt.pm.fm, mylegend, pp.gender.pm.fm ,
+  nrow = 3,
+  rel_heights = c(1, 0.1, 1),
+  labels = c("a", "", "b")
+)
+
+final.w.legend
+```
+
+
+
+### Fixed Effects Visualization of PP Model
+
+```{r fig.height=4.5, fig.width=7, message=FALSE, warning=FALSE}
+## - Why Gender 2 star, while one star in the final model?
+
+pp.fm.plot.pred <- sjPlot::plot_model(M1.pp.fit.FM,
+  show.values = TRUE, show.p = TRUE,
+  value.offset = 0.1,
+  title = ""
+) #+ my_theme1
+
+pp.fm.plot.pred$layers[[3]]$aes_params$vjust <- (0.1)
+pp.fm.plot.pred$layers[[3]]$aes_params$hjust <- (-0.1)
+
+
+pp.fm.plot.pred
+
+# # random effect
+# plot_model(M1.pp.fit.FM, "re")
+```
+
+### Diagnostic on Model residuals
+
+```{r M1_Diagnostic, echo=FALSE}
+M1.pp.fit.FM.res <- residuals(M1.pp.fit.FM, type = "pearson")
+
+qqnorm(M1.pp.fit.FM.res, main = "Normal Q-Q Plot | M1 residuals")
+qqline(M1.pp.fit.FM.res, col = "red")
+```
+
+\newpage
+
+# Model 2 - HR E4 Full Model
+
+```{r M2_fm, echo=FALSE, message=FALSE, warning=FALSE}
+M2.fit.fm <- lmer(scale(HR.E4Norm) ~ (1 | ParticipantID) + scale(SAI) + Question.Type + scale(QTime) + Grade + Gender, data = Qlevel, REML = FALSE)
+
+# Summary statistics of the full model
+summary(M2.fit.fm)
+summ(M2.fit.fm, digits = 3)
+```
+
+\newpage
+
+## Both-Direction Elimination (BDE)
+
+```{r echo=FALSE}
+step_bd <- step(M2.fit.fm, direction = "both")
+step_bd # Display elimination results
+
+FM = get_model(step_bd) # Display the final model
+```
+
+\newpage
+
+## HR E4 Final Model
+
+```{r M2_FM, echo=FALSE, message=FALSE, warning=FALSE}
+M2.fit.FM <- lmer(scale(HR.E4Norm) ~ (1 | ParticipantID) + Question.Type, data = Qlevel, REML = FALSE)
+
+#M2.fit.FM <- lmer(FM, data = Qlevel, REML = FALSE)
+
+summary(M2.fit.FM, digits = 3)
+summ(M2.fit.FM, digits = 3)
+```
+
+\newpage
+
+## Plot Final Model
+
+```{r message=FALSE, warning=FALSE}
+
+hre4.qt.pm.fm <- ggpredict(M2.fit.FM, terms = c("Question.Type")) %>%
+  mutate(group = as.factor(c("1", "2", "3"))) %>%
+  drop_na() %>% # check # of levels you've
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  scale_y_continuous(
+      limits = c(-0.7, 0.5),
+      breaks = seq(-0.7, 0.5, by = 0.3),
+      labels = scales::label_number(accuracy = 0.1)   # <— no scientific notation
+    ) +
+  scale_color_manual(values = c("gray", "red", "red")) +
+  my_theme_pred +
+  labs(x = "", 
+       y = TeX(hre4_y_lab)
+       )
+  
+
+hre4.qt.pm.fm
+```
+
+### Fixed Effects Visualization of HR E4 Model
+
+```{r fig.height=4.5, fig.width=7}
+
+pp.fm.plot.pred <- sjPlot::plot_model(M2.fit.FM,
+  show.values = TRUE, show.p = TRUE,
+  title = expression(bold(paste(bar(Delta * " " * bolditalic(HR[E4]) * ""), " Final Model ")))
+) + my_theme1
+
+pp.fm.plot.pred$layers[[3]]$aes_params$vjust <- (0.1)
+pp.fm.plot.pred$layers[[3]]$aes_params$hjust <- (0.3)
+
+pp.fm.plot.pred
+```
+
+## Diagnostic on Model residuals
+
+```{r echo=FALSE}
+M2.fit.FM.res <- residuals(M2.fit.FM, type = "pearson")
+
+qqnorm(M2.fit.FM.res, main = "Normal Q-Q Plot | HR E4 residuals")
+qqline(M2.fit.FM.res, col = "red")
+```
+
+
+\newpage
+
+# Model 3 - HR AW Full Model
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+M3.fit.fm <- lmer(scale(HR.AWNorm) ~ (1 | ParticipantID) + scale(SAI) + Question.Type + scale(QTime) + Grade + Gender, data = Qlevel, REML = FALSE)
+
+# Summary statistics of the full model
+summary(M3.fit.fm, digits = 3)
+summ(M3.fit.fm, digits = 3)
+```
+
+
+\newpage
+
+## Both-Direction Elimination (BDE)
+
+```{r echo=FALSE}
+step_bd <- step(M3.fit.fm, direction = "both")
+step_bd # Display elimination results
+
+FM = get_model(step_bd) 
+```
+
+\newpage
+
+## HR AW Final Model
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+M3.fit.FM <- lmer(scale(HR.AWNorm) ~ (1 | ParticipantID) + Question.Type + scale(QTime) + Grade, data = Qlevel, REML = FALSE)
+
+summary(M3.fit.FM, digits = 3)
+summ(M3.fit.FM, digits = 3)
+
+```
+
+\newpage
+
+## Plot Final Model
+
+```{r message=FALSE, warning=FALSE}
+# Question Type Final Model
+hr_aw.qt.pm.fm <- ggpredict(M3.fit.FM, terms = c("Question.Type")) %>%
+  mutate(group = as.factor(c("1", "2", "3"))) %>%
+  drop_na() %>% # check # of levels you've
+
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  scale_color_manual(values = c("gray", "red", "red")) +
+  #scale_y_continuous(limits = ylims) + # "none" removes the y-axis ticks and labels
+  scale_y_continuous(
+      limits = c(-0.7, 0.5),
+      breaks = seq(-0.7, 0.5, by = 0.3),
+      labels = scales::label_number(accuracy = 0.1)   # <— no scientific notation
+    ) +
+  my_theme_pred +
+  labs(x = "", 
+       y = TeX(hraw_y_lab)
+       )
+
+# Correctness
+hr_aw_grade.pm.fm <- ggpredict(M3.fit.FM, "Grade") %>%
+  mutate(group = as.factor(c("1", "2"))) %>%
+  drop_na() %>% # check # of levels you've
+
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  theme_bw() +
+  scale_color_manual(values = c("gray", "orange")) +
+  scale_y_continuous(limits = ylims, guide = "none") + # "none" removes the y-axis ticks and labels
+  my_theme_pred_quant+ 
+  labs(x = "", y = "")
+
+# hr_aw_grade.pm.fm
+
+# Solving Time
+hr_aw_st.pm.fm <- ggpredict(M3.fit.FM, "QTime") %>%
+  ggplot(aes(x, predicted)) +
+  geom_ribbon(aes(ymin = conf.low, ymax = conf.high), alpha = .2) +
+  geom_line(colour = "cyan", size = 2) +
+  geom_vline(
+    xintercept = mean(Qlevel$QTime),
+    linetype = "dashed",
+    color = "black",
+    size = 1
+  ) +
+  scale_y_continuous(limits = ylims, guide = "none") + # "none" removes the y-axis ticks and labels
+  my_theme_pred_quant + 
+  labs(x = "", y = "")
+
+# hr_aw_st.pm.fm
+
+cowplot::plot_grid(
+  hr_aw.qt.pm.fm, hr_aw_grade.pm.fm, hr_aw_st.pm.fm, 
+  ncol = 3,
+  scale = c(.97, .97, .97),
+  labels = c("a", "b", "c"),
+  label_size = 20
+)
+
+```
+
+### Fixed Effects Visualization of HR AW Model
+
+```{r fig.height=4.5, fig.width=7}
+
+pp.fm.plot.pred <- sjPlot::plot_model(M3.fit.FM,
+  show.values = TRUE, show.p = TRUE,
+  title = expression(bold(paste(bar(Delta * " " * bolditalic(HR))[AW] * "", " Final Model ")))
+) + my_theme1
+
+pp.fm.plot.pred$layers[[3]]$aes_params$vjust <- (0.1)
+pp.fm.plot.pred$layers[[3]]$aes_params$hjust <- (0.3)
+
+pp.fm.plot.pred
+```
+
+## Diagnostic on Model residuals
+
+```{r echo=FALSE}
+# Diagnostic on Model residuals
+
+M3.fit.FM.res <- residuals(M3.fit.FM, type = "pearson")
+
+qqnorm(M3.fit.FM.res, main = "HR AW Final Moldel residuals")
+qqline(M3.fit.FM.res, col = "red")
+```
+
+
+
+\newpage
+
+# Model 4 - NHRV Full Model
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+## NRHV model
+M4.fit.fm <- lmer(scale(HRVNorm) ~ (1 | ParticipantID) + scale(SAI) + Question.Type + scale(QTime) + Grade + Gender, data = Qlevel, REML = FALSE)
+
+# Summary statistics of the full model
+summary(M4.fit.fm)
+summ(M4.fit.fm, digits = 3)
+```
+
+
+
+\newpage
+
+## Both-Direction Elimination (BDE)
+
+```{r echo=FALSE}
+step_bd <- step(M4.fit.fm, direction = "both")
+step_bd # Display elimination results
+FM = get_model(step_bd) # Display the final model
+```
+
+\newpage
+
+## HRV Final Model
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+M4.fit.FM <- lmer(scale(HRVNorm) ~ (1 | ParticipantID) + Question.Type + Grade, data = Qlevel, REML = FALSE)
+
+summary(M4.fit.FM, digits = 3)
+summ(M4.fit.FM, digits = 3)
+```
+
+\newpage
+
+## Plot Final Model
+
+```{r fig.height=5, fig.width=6}
+# Question Type Final Model
+hrv.qt.pm.fm <- ggpredict(M4.fit.FM,
+  terms = c("Question.Type")
+) %>%
+  mutate(group = as.factor(c("1", "2", "3"))) %>%
+  drop_na() %>% # check # of levels you've
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  scale_color_manual(values = c("gray", "red", "red")) +
+  my_theme_pred +
+  scale_y_continuous(
+      limits = c(-0.7, 0.5),
+      breaks = seq(-0.7, 0.5, by = 0.3),
+      labels = scales::label_number(accuracy = 0.1)   # <— no scientific notation
+    ) +
+  labs(x = "", 
+       y = TeX(hrv_y_lab)
+       )
+
+
+# hrv.qt.pm.fm
+
+
+
+# Correctness
+hrv_grade.pm.fm <- ggpredict(M4.fit.FM, "Grade") %>%
+  mutate(group = as.factor(c("1", "2"))) %>%
+  drop_na() %>% # check # of levels you've
+  gather(key = "key", value = "value", conf.low, conf.high) %>%
+  ggplot() +
+  geom_line(aes(x = x, y = value, color = group), size = 2) +
+  geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
+  theme_bw() +
+  scale_color_manual(values = c("gray", "cyan")) +
+  scale_y_continuous(limits = ylims, guide = "none") + # "none" removes the y-axis ticks and
+  my_theme_pred_quant +
+  labs(x = "", 
+       y = ""
+       )
+
+
+final.w.legend <- cowplot::plot_grid(hrv.qt.pm.fm, hrv_grade.pm.fm, mylegend,
+  nrow = 2,
+  rel_heights = c(1,0.1)
+)
+
+final.w.legend
+```
+
+### Fixed Effects Visualization of HRV Model
+
+```{r fig.height=4.5, fig.width=7, message=FALSE, warning=FALSE}
+
+pp.fm.plot.pred <- sjPlot::plot_model(M4.fit.FM,
+  show.values = TRUE, show.p = TRUE,
+  title = expression(bold(paste(bar(" " * bolditalic(HRV) * ""), " Final Model ")))
+) + my_theme1 #+ xlim(-0.2, 0.2)
+
+pp.fm.plot.pred$layers[[3]]$aes_params$vjust <- (1.1)
+pp.fm.plot.pred$layers[[3]]$aes_params$hjust <- (0.7)
+
+#pp.fm.plot.pred$data$term <- c("Question.TypeA", "Question.TypeW", "Grade")
+
+pp.fm.plot.pred
+
+```
+
+## Diagnostic on Model residuals
+
+```{r echo=FALSE}
+M4.fit.FM.res <- residuals(M4.fit.FM, type = "pearson")
+
+qqnorm(M4.fit.FM.res, main = "Normal Q-Q Plot | M4 residuals")
+qqline(M4.fit.FM.res, col = "red")
+```
+
+
+\newpage
+
+# Paper figures 
+
+## 1-Multi-Regression-Plots.pdf
+
+```{r echo=FALSE, fig.height=11, fig.width=8}
+# QType, Gender, Grade, QTime
+
+pp.qt.pm.fm <- pp.qt.pm.fm + ggtitle(TeX("\\textit{QTYPE}"))
+pp.gender.pm.fm <- pp.gender.pm.fm + ggtitle(TeX("\\textit{SEX}"))
+
+
+
+#PP row
+row1 <- cowplot::plot_grid(
+  pp.qt.pm.fm, pp.gender.pm.fm , 
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("a1", "" ),
+  label_size = 20
+)
+
+#HR AW row
+hr_aw.qt.pm.fm <- hr_aw.qt.pm.fm + ggtitle("")
+hr_aw_grade.pm.fm <- hr_aw_grade.pm.fm + ggtitle( TeX("\\textit{QGRADE}"))
+row2 <- cowplot::plot_grid(
+  hr_aw.qt.pm.fm, hr_aw_grade.pm.fm, #hr_aw_st.pm.fm,
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("a2", ""),
+  label_size = 20
+)
+
+
+#HR E4 row
+hre4.qt.pm.fm <- hre4.qt.pm.fm + ggtitle("")
+
+row3 <- cowplot::plot_grid(
+  hre4.qt.pm.fm, NULL, 
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("a3", ""),
+  label_size = 20
+)
+
+# HRV row
+hrv.qt.pm.fm <- hrv.qt.pm.fm + ggtitle("")
+hrv_grade.pm.fm <- hrv_grade.pm.fm +  ggtitle( TeX("\\textit{QGRADE}"))
+row4 <- cowplot::plot_grid(
+hrv.qt.pm.fm,  hrv_grade.pm.fm,
+  nrow = 1,
+  scale = c(.97, .97),
+  labels = c("a4", ""),
+  label_size = 20
+)
+
+
+# --- 2. assume you already have this from before: ---
+final_5M <- cowplot::plot_grid(
+  row1, row2, row3, row4, mylegend,
+  nrow = 5,
+  rel_heights = c(1, 1, 1, 1, 0.1)
+)
+
+final_5M
+
+
+# # --- 1. build the title row ---
+# title_row <- ggdraw() +
+#   # Four labels centered at 1/8, 3/8, 5/8, 7/8 of the width
+#   draw_label("QTYPE", x = 1/8, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   draw_label("SEX",           x = 3/8, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   draw_label("GRADE",         x = 5/8, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   draw_label("QTIME [s]", x = 7/8, y = 0.5, fontface = "bold", hjust = 0.5) +
+#   theme(plot.margin = margin(0, 0, 0, 0))
+
+
+
+# # --- 3. stack the title row on top ---
+# final_with_headers <- cowplot::plot_grid(
+#   title_row,
+#   final_5M,
+#   ncol  = 1,
+#   rel_heights = c(0.05, 0.95)   # ~5% height for headers, 95% for your grid
+# )
+
+# --- 4. draw it ---
+#print(final_with_headers)
+
+
+
+```
+
+```{r echo=FALSE, fig.height=11, fig.width=8}
+
+final_5M
+# #Save the final_5M plot
+ggsave(
+  #filename = sprintf("%s1-Multi-Regression-Plots.pdf", plot_dir),
+  filename = sprintf("%sFigure11.pdf", plot_dir),
+  plot = final_5M,
+  width = 8,
+  height = 11,
+  dpi = 300
+)
+```
+
+
+# Table
+
+```{r}
+summ(M1.pp.fit.FM, digits = 3)$model@call
+M1_table = summ(M1.pp.fit.FM, digits = 3)$coeftable
+
+summ(M2.fit.FM, digits = 3)$model@call
+M2_table = summ(M2.fit.FM, digits = 3)$coeftable
+
+summ(M3.fit.FM, digits = 3)$model@call
+M3_table = summ(M3.fit.FM, digits = 3)$coeftable
+
+
+summ(M4.fit.FM, digits = 3)$model@call
+M4_table = summ(M4.fit.FM, digits = 3)$coeftable
+
+
+merge <- rbind(M1_table, M2_table, M3_table, M4_table)
+
+
+```
+
+
+
+```{r model-table, include=FALSE, results='asis'}
+library(dplyr)
+library(purrr)
+library(knitr)
+
+# 1) Put your models in a named list
+models <- list(
+  fEDA  = M1.pp.fit.FM,
+  HR_AW = M3.fit.FM,
+  HR_E4 = M2.fit.FM,
+  HRV   = M4.fit.FM
+)
+
+# 2) extract each summary(...$coefficients) into a data.frame
+coef_dfs <- lapply(models, function(mod) {
+  co <- summ(mod, digits = 3)$coeftable
+  #as.data.frame(co, stringsAsFactors = FALSE)
+  as.data.frame(co, stringsAsFactors = FALSE) %>% dplyr::select(-4)
+})
+
+# assume coef_dfs is your list of 4 data.frames,
+# each with rownames = predictor names and columns Est., S.E., t val., d.f., p
+
+# 1) figure out every predictor that appears in any model
+all_preds <- unique(unlist(lapply(coef_dfs, rownames)))
+
+# 2) for each df, turn rownames into a column, 
+#    re-order to 'all_preds', and then put rownames back
+aligned <- lapply(coef_dfs, function(df) {
+  df2 <- as.data.frame(df, stringsAsFactors=FALSE)
+  df2$Predictor <- rownames(df2)
+  
+  # reorder (and insert NA rows for missing preds)
+  df2 <- df2[match(all_preds, df2$Predictor), , drop=FALSE]
+  
+  # restore rownames
+  rownames(df2) <- all_preds
+  df2
+})
+
+# 3) drop the extra Predictor columns except in the first
+for(i in seq_along(aligned)) {
+  aligned[[i]]$Predictor <- NULL
+}
+
+
+# 4) now cbind them
+merged <- do.call(cbind, aligned)
+
+# 5) restore a single Predictor column in front
+merged <- cbind(Predictor = rownames(merged), merged, row.names=NULL)
+
+
+# Select all columns that end with ".Est." and drop them
+Est_all <- merged %>% dplyr::select(Predictor,ends_with(".Est."))
+SE_all <- merged %>% dplyr::select(Predictor,ends_with(".S.E."))
+t_all <- merged %>% dplyr::select(Predictor,ends_with(".t val."))
+p_all <- merged %>% dplyr::select(Predictor,ends_with(".p"))
+
+paper_merged <- cbind(Est_all, SE_all[, -1], t_all[, -1], p_all[, -1])
+
+```
+
+
+
+```{r merged-table, results='asis', echo=FALSE}
+
+# 2) Build your header labels
+stat_labels  <- c("Est", "S.E.", "t", "p")
+# bottom row: model names repeated under each stat
+model_names  <- c("fEDA", "HRAW", "HRE4", "HRV")
+var_labels   <- rep(model_names, times = length(stat_labels))
+
+# define a very light and a medium light gray
+light_gray  <- if (knitr::is_latex_output()) "gray!25" else "#E6E6E6"
+medium_gray <- if (knitr::is_latex_output()) "gray!50" else "#CCCCCC"
+
+
+paper_merged %>%  
+  mutate(
+    across(
+      ends_with(".p"),
+      ~ round(., 3)
+    )
+  ) %>%
+  mutate(
+    across(
+      ends_with(".p"),
+      ~ format.pval(., digits = 3, eps = 0.001)
+    )
+  ) %>%  mutate(
+    across(
+      ends_with(".t val"),
+      ~ round(., 3)
+    )
+  ) %>% 
+  kable(
+  digits = 3,
+  format          = "html",
+  #format          = "latex",
+  booktabs        = TRUE,
+  escape          = TRUE,
+  table.placement = "H",
+  col.names       = c("Predictor", var_labels),
+  align           = c("l", rep("r", length(var_labels)))
+) %>%
+  add_header_above(
+    header = c(
+      " "    = 1,
+      "Coefficient $b.$"    = 4,
+      "$S.E.$" = 4,
+      "$t$ value" = 4,
+      "Pr(>$|z|$)"  = 4
+    ),
+    bold = TRUE
+  ) %>%
+  column_spec(c(3,7, 11,15),   background = light_gray) %>% # myGray (0.8), #"gray!15"
+  column_spec(c(5, 9, 13 ,17),   background = medium_gray) %>%  # gray 0.7
+  column_spec(c(4,6,8),   background = "white")    %>%
+  kable_styling(
+    latex_options = c("hold_position","scale_down"),
+    font_size     = 11
+  )
+```
+
+

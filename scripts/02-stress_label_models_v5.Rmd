@@ -49,29 +49,30 @@ Model4: Stress HRV \
 
 
 ```{r include=FALSE}
-library(tidyverse)
-library(lubridate)
-library(ggplot2)
-library(cowplot)
-library(ggpubr)
-library(readr)
-library(gridExtra)
-library(dplyr)
-library(tidyr)
-library(knitr)
-library("car")
-library(lme4)
-library(lmerTest)
-library(lattice)
-library(sjPlot)
-library(Matrix)
-require(ggpmisc) # for stat_poly_eq
-library(reshape2)
-library(kableExtra)
-library(plotly)
-library(bestNormalize)
-library(jtools) # summ function
-library(latex2exp) # parses and converts LaTeX math formulas to R's plotmath expressions
+# library(tidyverse)
+# library(lubridate)
+# library(ggplot2)
+# library(cowplot)
+# library(ggpubr)
+# library(readr)
+# library(gridExtra)
+# library(dplyr)
+# library(tidyr)
+# library(knitr)
+# library("car")
+# library(lme4)
+# library(lmerTest)
+# library(lattice)
+# library(sjPlot)
+# library(Matrix)
+# require(ggpmisc) # for stat_poly_eq
+# library(reshape2)
+# library(kableExtra)
+# library(bestNormalize)
+# library(jtools) # summ function
+# library(latex2exp) # parses and converts LaTeX math formulas to R's plotmath expressions
+
+source("requirements.R")
 ```
 
 

@@ -31,7 +31,7 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column D: Perspiration**: Values of the perinasal perspiration signal in °C².
 -   **Column E: HR.E4**: Values of the heart rate signal in BPM, measured with E4 on the participant's non-dominant hand.
 -   **Column F: HR.AW**: Values of the heart rate signal in BPM, measured with the Apple Watch on the participant's dominant hand.
--   **Column G: HRV.IBI**: Values of the heart-rate variability, computed from inter-beat intervals (IBI, unit: ms), measured with E4 on the participant's non-dominant hand.
+
 
 **`data/processed/Affective_Math_Dataset_N50_Exam.csv`** contains the following columns:
 
@@ -51,8 +51,6 @@ This repository contains the code and plots for the paper "**Stress and performa
 -   **Column L: Question.Order**: Problem order within each Question.Type A, W, V [1–12].
 -   **Column M: Question.Number**: Alphanumeric label representing question order as given to participant. Levels: [1–36].
 -   **Column N: ExamVersion**: Indicates the counterbalancing order of the given exam.
--   **Column O: Feedback**: Participants' feedback or comments (free-text).
--   **Column P: course_cat**: The academic course category of the participant (e.g., subject area).
 #### **Psychometric Data** 
 -   **Column Q: SAI.Score**: Scores of the State & Trait Anxiety Inventory, range [20–80].
 ####  **Valence Data**
@@ -97,7 +95,7 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** contains the following columns:
 -   **Column N: Question.Order**: Problem order within each Question.Type category.
 -   **Column O: Question.Number**: Alphanumeric label representing question order as given to the participant (e.g., 1–36).
 -   **Column P: Grade**: Binary correctness indicator for this question (1 = correct, 0 = incorrect).
--   **Column Q: course_cat**: Academic course category of the participant (e.g., subject area).
+-   **Column Q: SUS.Score**: 
 
 ------------------------------------------------------------------------
 

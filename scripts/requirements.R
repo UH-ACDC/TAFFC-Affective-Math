@@ -8,6 +8,7 @@
 # List of required packages
 required_pkgs <- c(
   "tidyverse",    # data wrangling & ggplot2
+  "lattice",     # data visualization
   "lubridate",    # date/time parsing
   "cowplot",      # plot grids
   "ggpubr",       # publication-ready plots
@@ -29,7 +30,8 @@ required_pkgs <- c(
   "jtools",       # model summaries & plotting
   "latex2exp",    # LaTeX expressions in plots
   "ggeffects",    # marginal effects plots
-  "scales"        # axis scaling
+  "scales"  ,      # axis scaling
+  "bestNormalize" # normalization of non-normal data
 )
 
 # Install any missing packages

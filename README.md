@@ -92,23 +92,23 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** created by `00-data_preprocessi
 -   **Column R: SUS.Score**: System Usability Scale (SUS) Score. 
 -   **Column T: PPNorm_mean**: Mean of the normalized perinasal perspiration signal (PPNorm) across all samples for each participant–question.
 -   **Column U: PPNorm_n**: Number of data samples used to calculate PPNorm_mean.
--   **Column M: HR.E4Norm_mean**: Mean of the normalized heart‐rate signal from the E4 device (HR.E4Norm) across all samples for each participant–question.
--   **Column N: HR.E4Norm_n**: Number of data samples used to calculate HR.E4Norm_mean.
--   **Column O: HR.AWNorm_mean**: Mean of the normalized heart‐rate signal from the Apple Watch (HR.AWNorm) across all samples for each participant–question.
--   **Column P: HR.AWNorm_n**: Number of data samples used to calculate HR.AWNorm_mean.
--   **Column N: HRVNorm_mean**: Mean of the normalized heart‐rate variability signal (HRVNorm) across all samples for each participant–question.
--   **Column Q: HRVNorm_n**: Number of data samples used to calculate HRVNorm_mean.
--   **Column R: Stress.pp**:  Binary stress‐flag derived from the perinasal perspiration feature (S ≡ stress, NS ≡ no stress).
--   **Column R: Stress.hre4**:  Binary stress‐flag derived from the normalized E4 heart‐rate feature (HR.E4Norm) (S ≡ stress, NS ≡ no stress).
--   **Column R: Stress.hraw**:  Binary stress‐flag derived from the normalized Apple Watch heart‐rate feature (HR.AWNorm) (S ≡ stress, NS ≡ no stress).
--   **Column R: Stress.nhrv**: Binary stress‐flag derived from the normalized HRV feature (HRVNorm) (S ≡ stress, NS ≡ no stress).
--   **Column Q: F_Angry**: Facial-expression intensity for "Angry."
--   **Column R: F_Disgusted**: Facial-expression intensity for "Disgusted."
--   **Column S: F_Afraid**: Facial-expression intensity for "Afraid."
--   **Column T: F_Happy**: Facial-expression intensity for "Happy."
--   **Column U: F_Sad**: Facial-expression intensity for "Sad."
--   **Column V: F_Surprised**: Facial-expression intensity for "Surprised."
--   **Column W: F_Neutral**: Facial-expression intensity for "Neutral."
+-   **Column V: HR.E4Norm_mean**: Mean of the normalized heart‐rate signal from the E4 device (HR.E4Norm) across all samples for each participant–question.
+-   **Column W: HR.E4Norm_n**: Number of data samples used to calculate HR.E4Norm_mean.
+-   **Column X: HR.AWNorm_mean**: Mean of the normalized heart‐rate signal from the Apple Watch (HR.AWNorm) across all samples for each participant–question.
+-   **Column Y: HR.AWNorm_n**: Number of data samples used to calculate HR.AWNorm_mean.
+-   **Column Z: HRVNorm_mean**: Mean of the normalized heart‐rate variability signal (HRVNorm) across all samples for each participant–question.
+-   **Column AA: HRVNorm_n**: Number of data samples used to calculate HRVNorm_mean.
+-   **Column AB: Stress.pp**:  Binary stress‐flag derived from the perinasal perspiration feature (S ≡ stress, NS ≡ no stress).
+-   **Column AC: Stress.hre4**:  Binary stress‐flag derived from the normalized E4 heart‐rate feature (HR.E4Norm) (S ≡ stress, NS ≡ no stress).
+-   **Column AD: Stress.hraw**:  Binary stress‐flag derived from the normalized Apple Watch heart‐rate feature (HR.AWNorm) (S ≡ stress, NS ≡ no stress).
+-   **Column AE: Stress.nhrv**: Binary stress‐flag derived from the normalized HRV feature (HRVNorm) (S ≡ stress, NS ≡ no stress).
+-   **Column AF: F_Angry**: Facial-expression intensity for "Angry."
+-   **Column AG: F_Disgusted**: Facial-expression intensity for "Disgusted."
+-   **Column AH: F_Afraid**: Facial-expression intensity for "Afraid."
+-   **Column AI: F_Happy**: Facial-expression intensity for "Happy."
+-   **Column AJ: F_Sad**: Facial-expression intensity for "Sad."
+-   **Column AK: F_Surprised**: Facial-expression intensity for "Surprised."
+-   **Column AL: F_Neutral**: Facial-expression intensity for "Neutral."
 
 ------------------------------------------------------------------------
 

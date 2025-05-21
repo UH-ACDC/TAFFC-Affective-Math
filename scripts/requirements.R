@@ -1,4 +1,9 @@
-# requirement.R
+# =============================================================================
+# requirements.R
+#
+# Install and load all required packages for this project
+# Usage: source("requirements.R")
+# =============================================================================
 
 # List of required packages
 required_pkgs <- c(

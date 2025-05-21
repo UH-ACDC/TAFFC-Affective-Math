@@ -132,7 +132,7 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** created by `00-data_preprocessi
     -   Creates the Stress Models for the paper.
     -   Generates the model plots.
 
--   **01-multilinear_models_v5.Rmd**
+-   **03-valence_performance_models_v5.Rmd**
     -   Creates Valence Models, and Performance Model for the paper.
     -   Generates the coresponding model plots.
 

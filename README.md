@@ -121,8 +121,13 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** created by `00-data_preprocessi
 
 # Script Set
 
+Please run the following scripts sequentially.
+
 -   **requirements.R**
     - Install and load all required packages for this project
+-   **00-data_preprocessing.Rmd**
+    - Data wrangling and EDA plots
+    - Creates model data frame.
 
 -   **01-multilinear_models_v5.Rmd**
     -   Creates the Physiological Models, Valence Models, and Performance Model for the paper.

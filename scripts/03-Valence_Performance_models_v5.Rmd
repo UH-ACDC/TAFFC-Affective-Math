@@ -107,21 +107,21 @@ tmpD <- Qlevel  %>%
          HR.AWNorm, HRV.IBI, HRVNorm, SAI,
          QTime, QOrder,QNumber, Grade)
 
-# Update list according to the variable names in the data
-VarNames <- c(
-  "S", "QName", "QType", "Gender", "PPMean", "PPNorm", 
-  #"PPlogNorm",
-  "HRE4Mean", "HRAWMean", "HRE4Norm", 
-#"HRE4PerfNorm",
-  "HRAWNorm", "HRVIBIMean", "HRVNorm", "SAI",
-  "QSolTime", "QOrder", "QNumber", "Grade"
-)
+# # Update list according to the variable names in the data
+# VarNames <- c(
+#   "S", "QName", "QType", "Gender", "PPMean", "PPNorm", 
+#   #"PPlogNorm",
+#   "HRE4Mean", "HRAWMean", "HRE4Norm", 
+# #"HRE4PerfNorm",
+#   "HRAWNorm", "HRVIBIMean", "HRVNorm", "SAI",
+#   "QSolTime", "QOrder", "QNumber", "Grade"
+# )
 
 
-names(tmpD) <- VarNames
+# names(tmpD) <- VarNames
 
-M5_data <- tmpD %>%
-  dplyr::select(S, Grade, Gender, QType, QSolTime, PPNorm, HRE4Norm, HRAWNorm, HRVNorm, HRVIBIMean, SAI, QName)
+M5_data <- Qlevel %>%
+  dplyr::select(ParticipantID, Grade, Gender, Question.Type, QTime, PPNorm, HR.E4Norm, HR.AWNorm, HRVNorm, HRV.IBI, SAI, Question.Name)
 
 ```
 
@@ -133,7 +133,7 @@ M5_data <- tmpD %>%
 library(ggcorrplot)
 
 # Pairwise.complete.obs
-reduced_data <- subset(M5_data, select = c(-Grade, -QName, -S, -HRVNorm, -HRVIBIMean))
+reduced_data <- subset(M5_data, select = c(-Grade, -Question.Name, -ParticipantID, -HRVNorm, -HRV.IBI))
 # str(reduced_data)
 model.matrix(~., data = reduced_data) %>%
   cor(use = "everything") %>%
@@ -145,7 +145,7 @@ model.matrix(~., data = reduced_data) %>%
 ```{r echo=FALSE}
 
 M5.fit.full <-
-  glmer(Grade ~ 1 + Gender + QType + scale(QSolTime) + scale(PPNorm) + scale(SAI) + (1 | QName), family = binomial, data = M5_data)
+  glmer(Grade ~ 1 + Gender + Question.Type + scale(QTime) + scale(PPNorm) + scale(SAI) + (1 | Question.Name), family = binomial, data = M5_data)
 
 summary(M5.fit.full, digits = 3)
 summ(M5.fit.full, digits = 3)
@@ -155,11 +155,11 @@ summ(M5.fit.full, digits = 3)
 
 ## Manual Optimization based on the p-value
 
-### Remove QSolTime
+### Remove QTime
 
 ```{r echo=FALSE}
 M5.fit.fm <-
-  glmer(Grade ~ 1 + Gender + QType + scale(PPNorm) + scale(SAI) + (1 | QName), family = binomial, data = M5_data)
+  glmer(Grade ~ 1 + Gender + Question.Type + scale(PPNorm) + scale(SAI) + (1 | Question.Name), family = binomial, data = M5_data)
 
 summary(M5.fit.fm, digits = 3)
 summ(M5.fit.fm, digits = 3)
@@ -169,7 +169,7 @@ summ(M5.fit.fm, digits = 3)
 
 ```{r echo=FALSE}
 M5.fit.fm <-
- glmer(Grade ~ 1 + QType + scale(PPNorm) + scale(SAI) + (1 | QName), family = binomial, data = M5_data)
+ glmer(Grade ~ 1 + Question.Type + scale(PPNorm) + scale(SAI) + (1 | Question.Name), family = binomial, data = M5_data)
 
 summary(M5.fit.fm)
 summ(M5.fit.fm, digits = 3)
@@ -199,7 +199,7 @@ gradePP_sai.pm <- ggpredict(M5.fit.fm, "SAI [all]") %>%
   labs(
     x = "",
     y = "",
-    title = TeX("SAI")
+    title = TeX("\\textit{$SAI$}")
   )
 
 pp_y_lab <- sprintf("$\\bar{ \\textit{NFP}}$")
@@ -228,7 +228,7 @@ gradePP_pp.fm <- ggpredict(M5.fit.fm, "PPNorm [all]") %>%
 
 # Question Type
 gradePP.qt.pm <- ggpredict(M5.fit.fm,
-  terms = c("QType")
+  terms = c("Question.Type")
 ) %>%
   mutate(group = as.factor(c("1", "2", "3"))) %>%
   drop_na() %>% # check # of levels you've
@@ -249,7 +249,7 @@ gradePP.qt.pm <- ggpredict(M5.fit.fm,
     axis.title.y = element_text(size = 14, face = "bold"),
   ) +
   labs(
-    title = TeX("QTYPE"),
+    title = TeX("\\textit{QTYPE}"),
     x = "",
     y = TeX(" \\textit{P(QGRADE)}$"),
     y = NULL)
@@ -670,7 +670,7 @@ Valence_h.qt.pm.fm <- ggpredict(M6.Valence.fit.fm,
        #  expression(bold(ln) * bold(paste(bolditalic(P(H)) * ""))),
        #TeX(r'($\textit{ln}(P(HAPPY))$)'),
        TeX("$\\bar{\\textit{ln(HAPPY)}}"),
-        title = TeX("$QTYPE$")
+        title = TeX("\\textit{QTYPE}")
        )
 
 
@@ -742,7 +742,7 @@ Valence_af.qt.pm.fm <- ggpredict(M6.af.fit.fm,
   ) +
   my_theme_pred +
   labs(x = "", y = TeX("$\\bar{\\textit{AFRAID}}"),
-      title = TeX("$QTYPE$")
+      title = TeX("\\textit{QTYPE}")
        )
 
 

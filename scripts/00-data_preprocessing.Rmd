@@ -4,6 +4,10 @@ author: "Fettah Kiran"
 subtitle: "Data Preprocessing and Feature Engineering | N = 50 "
 date: "`r Sys.Date()`"
 output:
+  pdf_document: 
+    toc: true
+    number_sections: true 
+    keep_tex: true
   html_document:
     df_print: paged
     toc: true
@@ -11,10 +15,6 @@ output:
     theme: united
     number_sections: true 
     mathjax: default
-  pdf_document: 
-    toc: true
-    number_sections: true 
-    keep_tex: true
 header-includes:
   - \usepackage[table]{xcolor}
   - \definecolor{myGray}{gray}{0.8}
@@ -99,6 +99,7 @@ Df_BL <- read.csv(file_path_BL, header = TRUE, sep = ",")
 Df_Exam <- read.csv(file_path_Exam, header = TRUE, sep = ",", stringsAsFactors = T)
 
 names(Df_Exam)
+colSums(!is.na(Df_Exam))
 
 
 ```
@@ -909,7 +910,7 @@ mytheme1bold.italic <- my_theme1 + theme(
 
 set.seed(123)  # for reproducibility
 
-level3 <- Qlevel %>%
+grade_CI <- Qlevel %>%
   # 1) Turn Grade factor into numeric 0/1
   mutate(
     Grade_num = as.numeric(as.character(Grade)),
@@ -939,12 +940,12 @@ level3 <- Qlevel %>%
     fifty = map_dbl(boot_samples, ~ quantile(.x, 0.05) * 100) %>% round(2)
   )
 
-level3
+grade_CI
 
 
 
 ## Performance Grade ####
-performance_grade <- ggplot(level3, aes(x = Question.Type, y = Correct.Percent, fill = Question.Type)) +
+performance_grade <- ggplot(grade_CI, aes(x = Question.Type, y = Correct.Percent, fill = Question.Type)) +
   geom_col() +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2) +
   geom_text(aes(label = Correct.Percent),  vjust = 3.5, hjust = 0.5, parse = TRUE,
@@ -1022,9 +1023,7 @@ sai.plot_violin <- Subject_level %>%
 panel.EDA <- cowplot::plot_grid(
   time.plot,
   performance_grade,
-  #sai.plot,
   sai.plot_violin,
-  #gender.plot,
   #labels = c("a", "b", "c", "d"),
   labels = c("a", "b", "c"),
   label_size = 20,  
@@ -1043,8 +1042,8 @@ if (is_save == TRUE) {
 
 ```
 
-# Time, Grade Stats per Question Type
-```{r}
+# Time, Grade, Gender, SAI and SUS Descriptive Statistics
+```{r eval=FALSE, include=FALSE}
 
  Qlevel %>%
   group_by(Question.Type) %>%
@@ -1058,7 +1057,7 @@ if (is_save == TRUE) {
   )
 
 print("Grade Stats per Question Type")
-level3
+grade_CI
 
 print("SAI Stats per Question Type")
 
@@ -1074,8 +1073,85 @@ Qlevel %>%
     median = median(SAI, na.rm = T),
     min = min(SAI, na.rm = T),
     max = max(SAI, na.rm = T)
+)
+
+print("SUS Descriptive Stats")
+Qlevel %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    SUS = first(SUS)
+  ) %>%
+  summarise(
+    n = n(),
+    mean = mean(SUS, na.rm = T),
+    sd = sd(SUS, na.rm = T),
+    median = median(SUS, na.rm = T),
+    min = min(SUS, na.rm = T),
+    max = max(SUS, na.rm = T)
   )
 
+print(" Gender Descriptive Stats")
+
+
+```
+
+
+```{r}
+# --- helper: generic summary function ---
+summarise_stats <- function(df, group_vars, measure) {
+  group_syms <- rlang::syms(group_vars)
+  measure_sym <- rlang::sym(measure)
+
+  df %>%
+    group_by(!!!group_syms) %>%
+    summarise(
+      n      = n(),
+      mean   = mean(!!measure_sym, na.rm = TRUE),
+      sd     = sd(!!measure_sym, na.rm = TRUE),
+      median = median(!!measure_sym, na.rm = TRUE),
+      min    = min(!!measure_sym, na.rm = TRUE),
+      max    = max(!!measure_sym, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+# 1. Grade (QTime) stats by Question.Type
+grade_stats <- summarise_stats(Qlevel, "Question.Type", "QTime")
+print("Grade Stats per Question Type")
+print(grade_stats)
+
+# 2. Participant‐level summary for SAI, SUS, and Gender
+participant_summary <- Qlevel %>%
+  group_by(ParticipantID) %>%
+  summarise(
+    SAI    = first(SAI),
+    SUS    = first(SUS),
+    Gender = first(Gender),
+    .groups = "drop"
+  )
+
+# 2a. SAI stats across participants
+sai_stats <- summarise_stats(participant_summary, character(), "SAI")
+print("SAI Stats per Participant")
+print(sai_stats)
+
+# 2b. SUS stats across participants
+sus_stats <- summarise_stats(participant_summary, character(), "SUS")
+print("SUS Descriptive Stats")
+print(sus_stats)
+
+# 2c. Gender distribution
+gender_stats <- participant_summary %>%
+  count(Gender) %>%
+  mutate(Percentage = n / sum(n) * 100)
+print("Gender Descriptive Stats")
+print(gender_stats)
+
+
+print("Gender Descriptive Stats")
+
+grade_CI %>% dplyr::select( -boot_samples, -fifty
+)
 ```
 
 # SUS
@@ -1163,8 +1239,7 @@ Df_Exam_offline_p_cut <- Df_Exam.SubSet %>%
         QNumber = first(Question.Number),
         QType = first(Question.Type),
         EVersion = first(ExamVersion),
-        Grade = first(Attempt.Correctness), #  Attempt.Correctness = grade
-        Time_mean = mean(Time, na.rm = T)
+        Grade = first(Attempt.Correctness) #  Attempt.Correctness = grade
       ) %>% arrange(.,QNumber)
     
 Df_Exam_offline_p_cut$QType <- factor(Df_Exam_offline_p_cut$QType, levels = c("W", "V", "A"))
@@ -1313,7 +1388,219 @@ if (is_save == TRUE) {
 ```
 
 
-## Collinearity Check for all predictors
+# S006 all
+
+```{r S006_all, include=FALSE}
+pids <- "S006"
+
+pdf (file = sprintf("%sFigure6_all.pdf", plot_dir), width = 10, height = 5)
+
+pids_list = unique(Df_Exam.SubSet$ParticipantID)
+
+for(pids in pids_list){
+
+
+Df_Exam_offline_p_cut <- Df_Exam.SubSet %>%
+      dplyr::filter(ParticipantID == pids) %>%
+      group_by(ParticipantID,Question.Name) %>%
+      mutate(Time2 = Time) %>% # keep time as numeric to use in the plot
+      summarise(
+        Gender = first(Gender),
+        Perspiration = mean(Perspiration, na.rm = T),
+        PP_Offline = NA,#mean(Perspiration_offline, na.rm = T),
+        HR.E4 = mean(HR.E4, na.rm = T),
+        HR.AW = mean(HR.AW, na.rm = T),
+        QName = first(Question.Name),
+        QNumber = first(Question.Number),
+        QType = first(Question.Type),
+        EVersion = first(ExamVersion),
+        Grade = first(Attempt.Correctness) #  Attempt.Correctness = grade
+      ) %>% arrange(.,QNumber)
+
+    
+Df_Exam_offline_p_cut$QType <- factor(Df_Exam_offline_p_cut$QType, levels = c("W", "V", "A"))
+
+
+QType_colors <- c("V" = "red", "A" = "green", "W" = "blue")
+
+
+PP_min        = min(Df_Exam_offline_p_cut$Perspiration, na.rm = TRUE)
+PP_max        = max(Df_Exam_offline_p_cut$Perspiration, na.rm = TRUE)
+PP_threshold  = PP_max* (PP_max - PP_min)*1.50
+HR_mean       = mean(Df_Exam_offline_p_cut$HR.E4, na.rm = TRUE)
+HR_max        = max(Df_Exam_offline_p_cut$HR.E4, na.rm = TRUE)
+HR_threshold  = (HR_max - 5)
+      
+
+PP_unit <- "°C$^2$" # 
+HR_unit = "bpm" # both HR E4 and AW are in BPM
+# HRV_unit = "s"
+
+
+# expression(paste(italic(FP) * " [", degree, " C"^2, "]"))
+pp_title =   sprintf("$\\textit{FP}$ \\[%s\\]", PP_unit)
+hr_title =  sprintf("\\textit{$HR_{AW}$} & \\textit{$HR_{E4}$ }\\[%s\\]", HR_unit)
+#hrv_title =  sprintf("$\\bar{\\Delta \\textit{HRV}}$ [%s]", HRV_unit)
+
+
+pp_plot <-   Df_Exam_offline_p_cut %>%
+  filter(ParticipantID %in% pids) %>%
+  group_by(ParticipantID) %>%
+  mutate(Time = 1:n()) %>%
+  ggplot(aes(x = Time, y = Perspiration, group = ParticipantID)) +
+  geom_line() +
+  my_theme1 +
+  theme(strip.background = element_blank(), strip.placement = "outside") +
+  stat_correlation(mapping = use_label(c("n")), label.x = "center", size = 6) +
+  labs(title = TeX(pp_title), x = TeX("\\textit{$QNUMBER$}"), y = "") +
+geom_hline(
+  data      = filter(Df_BL.mean, ParticipantID %in% pids),
+  aes(
+    yintercept = Perspiration,
+    linetype   = "BL"            # map the aesthetic to "BL" instead of "dashed"
+  ),
+  color     = "blue",
+  show.legend = TRUE
+) +
+scale_linetype_manual(
+  name   = "",                  # optional: set your legend title here
+  values = c(BL = "dashed"),    # map "BL" to the dashed linetype
+  labels = c(BL = "FP_BL")         # label the legend key as "BL"
+) +
+geom_rect(
+  aes(
+    xmin = Time,
+    xmax = Time + 1,
+    ymin = -Inf, ymax = Inf, #PP_threshold,
+    fill = QType
+  ),
+  alpha = 0.3,
+  inherit.aes = FALSE,
+  show.legend = TRUE
+) +
+scale_fill_manual(
+  breaks = c("W", "V", "A"),
+  labels = c("WORD", "VIEO", "ABSTRACT" ),
+  values = scales::alpha(QType_colors, 0.3)
+ )
+
+
+hr_plot <- Df_Exam_offline_p_cut %>%
+  filter(ParticipantID %in% pids) %>%
+  group_by(ParticipantID) %>%
+    mutate(Time = 1:n()) %>%
+      mutate(
+        n_hr.aw = sum(!is.na(HR.AW)),
+        n_hr.e4 = sum(!is.na(HR.E4))
+      ) %>%
+  ggplot(aes(x = Time, y = HR.E4)) +
+  geom_line(aes(fill = "black")) +
+  geom_rect(aes(
+    xmin = Time,
+    xmax = Time+1 ,
+    ymin = -Inf, ymax = Inf,#HR_threshold,
+    fill = QType
+  ),   alpha = 0.3,
+  size      = 0.5,    # ← set the same thickness everywhere
+  color     = NA,     # or "black" if you want an outline
+  inherit.aes = FALSE,
+  show.legend = TRUE) +    
+  scale_fill_manual(values = alpha(QType_colors, 0.3))+
+  geom_point(aes(x = Time, y = HR.AW), size = 1, alpha = 0.2, color = "red") +
+  geom_text(aes( label = sprintf("italic(n)[AW] == %d", n_hr.aw), color = "red",
+                  x = 18 , y = HR_threshold ), parse = TRUE, size = 6, hjust = 1, vjust = 0) +
+  geom_text(aes(label = sprintf("italic(n)[E4] == %d", n_hr.e4),
+                x = 18+ 3, y = HR_threshold), parse = TRUE, size = 6, hjust = 0, vjust = 0) +
+  my_theme1 +
+  labs(x = TeX("\\textit{$QNUMBER$}"), y = "") +
+  geom_hline(
+    data = filter(Df_BL.mean, ParticipantID %in% pids),
+    aes(yintercept = HR.E4, linetype = "BL_E4"), color = "blue"
+  ) +
+  geom_hline(
+    data = filter(Df_BL.mean, ParticipantID %in% pids),
+    aes(yintercept = HR.AW, linetype = "BL_AW"), color = "orange"
+  ) + ggtitle(TeX(hr_title))
+
+
+
+#s006_raw = ggpubr::ggarrange(pp_plot, hr_plot, ncol = 2, nrow = 1, align = "h") 
+# s006_raw <- ggpubr::ggarrange(
+#   pp_plot, hr_plot,
+#   ncol       = 2, 
+#   nrow       = 1, 
+#   align      = "h",
+#   labels     = c("a", "b"),               # your panel labels
+#   label.x    = c(0.05, 0.05),             # x‐position of each label
+#   label.y    = c(0.99, 0.99),             # y‐position of each label
+#   font.label = list(size = 20, face = "bold")
+# )
+
+
+s006_raw <- cowplot::plot_grid(
+  pp_plot, hr_plot,
+  ncol        = 2,
+  nrow        = 1,
+  align       = "h",
+  labels      = c("a", "b"),
+  label_x     = c(0.05, 0.05),
+  label_y     = c(0.99, 0.99),
+  label_size     = 20,
+  label_fontface = "bold"
+)
+
+#print(s006_raw)
+
+legend_QType <- ggpubr::get_legend(
+  ggplot(
+    data.frame(Question.Type = factor(c("W","V","A"), levels = c("W","V","A"))),
+    aes(x = Question.Type, fill = Question.Type)
+  ) +
+    geom_bar(alpha = 0.3) +
+    scale_fill_manual(
+      name   = pids,  # ← set the legend title to the current participant ID
+      values = scales::alpha(QType_colors, 0.3),
+      labels = c("WORD", "VIDEO", "ABSTRACT"),
+      guide  = guide_legend(override.aes = list(alpha = 0.3))
+    ) +
+    theme_void() +
+    theme(
+      legend.position = "bottom",
+      legend.title    = element_text(size = 14, face = "bold")  # optional styling
+    )
+)
+
+
+# stack the main plot above and the legend below
+# final_plot <- cowplot::plot_grid(
+#   s006_raw,
+#   align = "h",
+#   legend_QType,
+#   ncol        = 1,
+#   rel_heights = c(1, 0.1)
+# )
+
+final_plot <- cowplot::plot_grid(
+  s006_raw,        # 1st panel: your two‐panel figure
+  legend_QType,    # 2nd panel: the legend grob
+  ncol        = 1,          # stack them vertically
+  rel_heights = c(1, 0.1),   # give the legend just 10% of the height
+  align       = "v"         # align vertically
+)
+print(final_plot)
+
+
+
+# if (is_save == TRUE) {
+#   path_name <- sprintf("%sFigure6_all.pdf", plot_dir) # S006_Plots.pdf
+#   ggsave(path_name, final_plot, width = 10, height = 5)
+# }
+}
+dev.off()
+
+```
+
+## Collinearity matrix for all model predictors
 
 ```{r Multi-Regr-Collinearity-Plot, fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
 library(ggcorrplot)

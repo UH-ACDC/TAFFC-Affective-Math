@@ -6,6 +6,8 @@ This repository contains the novel video questions, the R code, and the plots as
 The YouTube links to the novel video questions can be found [here](VideoQuestions.md).
 
 
+
+
 ## The R Code
 
 ### Requirements
@@ -22,6 +24,8 @@ The YouTube links to the novel video questions can be found [here](VideoQuestion
     -   Open the `scripts/requirements.R` file in RStudio.
     -   Run the code in the `scripts/requirements.R` file.
 3.  Run the scripts in the `scripts/` folder to generate the data and plots.
+
+
 
 ## The Dataset
 

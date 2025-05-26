@@ -23,7 +23,7 @@ The YouTube links to the novel video questions can be found [here](VideoQuestion
     -   Run the code in the `scripts/requirements.R` file.
 3.  Run the scripts in the `scripts/` folder to generate the data and plots.
 
-## Data
+## The Dataset
 
 ### Data description
 

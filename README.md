@@ -124,7 +124,7 @@ The **`data/processed/TAFFC_ModelData_N50.csv`** created by `00-data_preprocessi
 
 # The folders are organized as follows:
 
--   `data/` contains the data used in the paper.
+-   `data/processed/` contains the data used in the paper.
 -   `figures/` contains the plots generated in the paper.
 -   `scripts/` contains the scripts used to generate the data and plots.
 -   `README.md` is this file.

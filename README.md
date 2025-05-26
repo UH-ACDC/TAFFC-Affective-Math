@@ -6,14 +6,14 @@ This repository contains the novel video questions, the R code, and the plots as
 The YouTube links to the novel video questions can be found [here](VideoQuestions.md).
 
 
-## Getting started
+## The R Code
 
 ### Requirements
 
 -   R and RStudio
 -   Required packages
 
-> sessionInfo() R version 4.4.1 (2024-06-14) Platform: aarch64-apple-darwin20 Running under: macOS 15.4.1
+> `sessionInfo()` R version 4.4.1 (2024-06-14) Platform: aarch64-apple-darwin20 Running under: macOS 15.4.1
 
 ### Installation
 

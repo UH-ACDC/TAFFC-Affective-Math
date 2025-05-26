@@ -6,7 +6,8 @@ This repository contains the novel video questions, the R code, and the plots as
 The YouTube links to the novel video questions can be found [here](VideoQuestions.md).
 
 
-
+&nbsp;
+&nbsp;
 
 ## The R Code
 
@@ -26,7 +27,8 @@ The YouTube links to the novel video questions can be found [here](VideoQuestion
 3.  Run the scripts in the `scripts/` folder to generate the data and plots.
 
 
-
+&nbsp;
+&nbsp;
 ## The Dataset
 
 ### Data description

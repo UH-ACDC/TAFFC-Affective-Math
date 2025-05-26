@@ -2,6 +2,10 @@
 
 This repository contains the code and plots for the paper "**Stress and performance in affective and conventional forms of math exams**" submitted to TAFFC 2025.
 
+## Video Questions
+All video question links are [here](VideoQuestions.md).
+
+
 ## Getting started
 
 ### Requirements

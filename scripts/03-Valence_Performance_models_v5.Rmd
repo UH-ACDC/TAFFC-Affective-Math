@@ -101,24 +101,11 @@ Qlevel$Grade <- relevel(factor(Qlevel$Grade), ref = "0")
 names(Qlevel)
 
 tmpD <- Qlevel  %>%
-  dplyr::select(ParticipantID, Question.Name, Question.Type,Gender, Perspiration, PPNorm, #PPlogNorm,
+  dplyr::select(ParticipantID, Question.Name, Question.Type,Gender, Perspiration, PPNorm,
          HR.E4,HR.AW, HR.E4Norm, 
-#HRE4PerfNorm, 
          HR.AWNorm, HRV.IBI, HRVNorm, SAI,
          QTime, QOrder,QNumber, Grade)
 
-# # Update list according to the variable names in the data
-# VarNames <- c(
-#   "S", "QName", "QType", "Gender", "PPMean", "PPNorm", 
-#   #"PPlogNorm",
-#   "HRE4Mean", "HRAWMean", "HRE4Norm", 
-# #"HRE4PerfNorm",
-#   "HRAWNorm", "HRVIBIMean", "HRVNorm", "SAI",
-#   "QSolTime", "QOrder", "QNumber", "Grade"
-# )
-
-
-# names(tmpD) <- VarNames
 
 M5_data <- Qlevel %>%
   dplyr::select(ParticipantID, Grade, Gender, Question.Type, QTime, PPNorm, HR.E4Norm, HR.AWNorm, HRVNorm, HRV.IBI, SAI, Question.Name)
@@ -196,6 +183,9 @@ gradePP_sai.pm <- ggpredict(M5.fit.fm, "SAI [all]") %>%
     breaks = seq(0.1, 0.9, by = 0.2) 
   ) +
   my_theme_pred_quant + 
+        theme(
+    axis.title.y = element_text(size = 16, face = "bold"),
+  ) +
   labs(
     x = "",
     y = "",
@@ -278,22 +268,6 @@ p12.ap.legend <- cowplot::plot_grid(p12.ap,
 p12.ap.legend
 
 
-# p34.st.sai <- cowplot::plot_grid(
-#   gradePP.qt.pm,
-#   nrow = 1,
-#   scale = c(.97),
-#   labels = c("b"),
-#   label_size = 20
-# )
-# 
-# 
-# final.w.legend <- cowplot::plot_grid(p12.ap.legend, p34.st.sai,
-#   nrow = 2,
-#   rel_heights = c(1, 1)
-# )
-# 
-# final.w.legend
-
 ```
 
 ## Fixed Effects Visualization of Grade Model
@@ -373,11 +347,7 @@ long_data %>%
     y = "Observations [%]", x = ""
   ) +
   my_theme1 +
-  theme(legend.position = "none") # +
-  # geom_text(aes(label = paste0("~italic(n)", " == ", n), y = 75),
-  #   size = 4, vjust = -1, hjust = 0.75, parse = TRUE, angle = 90,
-  #   position = position_dodge(width = 1)
-  # )
+  theme(legend.position = "none") 
 ```
 
 ### Valence Stack Plot - Figure 10a
@@ -445,11 +415,10 @@ Valence_Qlevel_stack <- long_data %>%
 Valence_Qlevel_stack
 
 # Save the plot
-#if (is_save == TRUE) {
-  #f_path <- sprintf("%sValence_Qlevel_stack-1.pdf", plot_dir, N)
+if (is_save == TRUE) {
   f_path <- sprintf("%sFigure10a.pdf", plot_dir, N) #  Valence_Qlevel_stack-2
   ggsave(f_path, width = 11, height = 7)
-#}
+}
 
 ```
 
@@ -586,23 +555,6 @@ Valence.Qtype.LogNeutral <- Valence.Qlevel %>%
     position = position_dodge(width = 0.75)
   )
 
-# Valence.Qtype.LogNeutral
-
-
-# Valence.Qtype.Others <- Valence.Qlevel %>%
-#   ggplot(aes(x = Question.Type, y = Others, fill = Question.Type)) +
-#   geom_boxplot(position = position_dodge(width = 0.9)) +
-#   ggtitle(bquote("Question Type")) +
-#   my_theme1 +
-#   labs(title = "Others - Qlevel", x = "", y = "") +
-#   stat_summary(
-#     fun.data = n_fun, geom = "text", fun.y = median,
-#     parse = T, size = 5, vjust = -0.75, hjust = -0.75, angle = 90,
-#     position = position_dodge(width = 0.75)
-#   )
-
-# Valence.Qtype.Others
-
 
 Valence.Qtype.Afraid <- Valence.Qlevel %>%
   ggplot(aes(x = Question.Type, y = Afraid, fill = Question.Type)) +
@@ -666,10 +618,11 @@ Valence_h.qt.pm.fm <- ggpredict(M6.Valence.fit.fm,
     breaks = seq(0, 1, by = 0.005) # Sets y-axis breaks to increase by 0.1
   ) +
   my_theme_pred +
+    theme(
+    axis.title.y = element_text(size = 16, face = "bold"),
+  ) +
   labs(x = "", y = 
-       #  expression(bold(ln) * bold(paste(bolditalic(P(H)) * ""))),
-       #TeX(r'($\textit{ln}(P(HAPPY))$)'),
-       TeX("$\\bar{\\textit{ln(HAPPY)}}"),
+       TeX("$\\textit{ln{\\bar{\\textsc{P}}}_{HAPPY}}"),
         title = TeX("\\textit{QTYPE}")
        )
 
@@ -691,7 +644,6 @@ pp.fm.plot.pred <- sjPlot::plot_model(M6.Valence.fit.fm,
 pp.fm.plot.pred$layers[[3]]$aes_params$vjust <- (0.1)
 pp.fm.plot.pred$layers[[3]]$aes_params$hjust <- (0.3)
 
-# pp.fm.plot.pred$data$term <- c("Question.TypeA", "Question.TypeW", "Grade")
 
 pp.fm.plot.pred
 
@@ -735,13 +687,17 @@ Valence_af.qt.pm.fm <- ggpredict(M6.af.fit.fm,
   geom_point(aes(x = x, y = predicted, color = group, size = 2)) +
   theme_bw() +
   scale_color_manual(values = c("gray", "red", "black")) +
-#  scale_y_continuous(labels = scales::percent) +
   scale_y_continuous(
     limits = c(0.1, 0.3),
     breaks = seq(0, 1, by = 0.1) # Sets y-axis breaks to increase by 0.1
   ) +
   my_theme_pred +
-  labs(x = "", y = TeX("$\\bar{\\textit{AFRAID}}"),
+      theme(
+    axis.title.y = element_text(size = 16, face = "bold"),
+  ) +
+  labs(x = "",
+       #y = TeX("$\\bar{\\textit{AFRAID}}"),
+       y = TeX("$\\textit{\\bar{{P}}_{AFRAID}}"),,
       title = TeX("\\textit{QTYPE}")
        )
 
@@ -796,9 +752,6 @@ Valence_af.qt.pm.fm, NULL,
 )
 
 
-
-
-
 Grade_final <- cowplot::plot_grid(gradePP.qt.pm,
   gradePP_sai.pm, gradePP_pp.fm,
   nrow = 1,
@@ -833,7 +786,7 @@ if (is_save == TRUE) {
 
 
 
-# Valence Table III
+# Valence Table IV
 
 ```{r Valence-table3, echo=FALSE}
 
@@ -881,9 +834,6 @@ merged_valence <- do.call(cbind, aligned_valence)
 # 5) restore a single Predictor column in front
 merged_valence <- cbind(Predictor = rownames(merged_valence), merged_valence, row.names=NULL)
 
-# inspect
-#print(merged_valence)
-
 
 # Select all columns that end with ".Est." and drop them
 Est_all <- merged_valence %>% dplyr::select(Predictor,ends_with(".Est."))
@@ -892,9 +842,6 @@ t_all <- merged_valence %>% dplyr::select(Predictor,ends_with(".t val."))
 p_all <- merged_valence %>% dplyr::select(Predictor,ends_with(".p"))
 
 paper_merged <- cbind(Est_all, SE_all[, -1], t_all[, -1], p_all[, -1])
-
-
-
 
 ```
 
@@ -960,7 +907,7 @@ paper_merged %>%
 
 
 
-# Performance Table IV
+# Performance Table V
 
 ```{r echo=FALSE}
 # 1) Put your models in a named list
@@ -1005,9 +952,6 @@ merged_valence <- do.call(cbind, aligned_valence)
 
 # 5) restore a single Predictor column in front
 merged_valence <- cbind(Predictor = rownames(merged_valence), merged_valence, row.names=NULL)
-
-# inspect
-#print(merged_valence)
 
 
 paper_merged <- 

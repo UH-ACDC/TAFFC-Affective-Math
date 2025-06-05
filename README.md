@@ -1,6 +1,7 @@
 # TAFFC-Affective-Math
 
-This repository contains the novel video questions, the R code, and the plots associated with the manuscript "**Stress and performance in affective and conventional forms of math exams**" submitted to IEEE TAFFC in May 2025.
+This repository contains the novel video questions, the R code, and the plots associated with the manuscript "**Reducing Stress in Math Tests through
+Video-Based Question Formats: A Multimodal Affective Study**" submitted to IEEE TAFFC in May 2025.
 
 ## Video Questions
 The YouTube links to the novel video questions can be found [here](VideoQuestions.md).

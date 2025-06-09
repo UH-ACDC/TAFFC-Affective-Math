@@ -197,10 +197,10 @@ summ(M1.pp.fit.fm, digits = 3)
 
 \newpage
 
-## Both-Direction Elimination (BDE)
+## Backward-Direction Elimination (BDE)
 
 ```{r echo=FALSE}
-step_bd <- step(M1.pp.fit.fm, direction = "both")
+step_bd <- step(M1.pp.fit.fm, direction = "backward")
 step_bd # Display elimination results
 
 FM = get_model(step_bd) # Display the final model
@@ -321,10 +321,10 @@ summ(M2.fit.fm, digits = 3)
 
 \newpage
 
-## Both-Direction Elimination (BDE)
+## Backward-Direction Elimination (BDE)
 
 ```{r echo=FALSE}
-step_bd <- step(M2.fit.fm, direction = "both")
+step_bd <- step(M2.fit.fm, direction = "backward")
 step_bd # Display elimination results
 
 FM = get_model(step_bd) # Display the final model
@@ -411,10 +411,10 @@ summ(M3.fit.fm, digits = 3)
 
 \newpage
 
-## Both-Direction Elimination (BDE)
+## Backward-Direction Elimination (BDE)
 
 ```{r echo=FALSE}
-step_bd <- step(M3.fit.fm, direction = "both")
+step_bd <- step(M3.fit.fm, direction = "backward")
 step_bd # Display elimination results
 
 FM = get_model(step_bd) 
@@ -547,10 +547,10 @@ summ(M4.fit.fm, digits = 3)
 
 \newpage
 
-## Both-Direction Elimination (BDE)
+## Backward-Direction Elimination (BDE)
 
 ```{r echo=FALSE}
-step_bd <- step(M4.fit.fm, direction = "both")
+step_bd <- step(M4.fit.fm, direction = "backward")
 step_bd # Display elimination results
 FM = get_model(step_bd) # Display the final model
 ```
